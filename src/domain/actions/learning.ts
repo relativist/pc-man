@@ -8,9 +8,29 @@ function getBookById(gameState: GameState, bookId: string): Book | undefined {
   return gameState.world.availableBooks.find((book) => book.id === bookId);
 }
 
-function resolveBookRewardTrack(book: Book): SkillTrackId | null {
+function resolveUniversalBookRewardTrack(gameState: GameState): SkillTrackId {
+  if (gameState.career.currentTrack && gameState.career.currentTrack !== "cto") {
+    return gameState.career.currentTrack;
+  }
+
+  const strongestTrack = Object.values(gameState.skills.tracks).sort((left, right) => {
+    if (right.points !== left.points) {
+      return right.points - left.points;
+    }
+
+    if (right.level !== left.level) {
+      return right.level - left.level;
+    }
+
+    return left.track.localeCompare(right.track);
+  })[0];
+
+  return strongestTrack?.track ?? "qa";
+}
+
+function resolveBookRewardTrack(gameState: GameState, book: Book): SkillTrackId | null {
   if (book.track === "universal") {
-    return "qa";
+    return resolveUniversalBookRewardTrack(gameState);
   }
 
   if (book.track === "cto") {
@@ -110,7 +130,7 @@ export function completeActiveBook(gameState: GameState): GameState {
     throw new Error(`Active book not found: ${activeBookId}`);
   }
 
-  const rewardTrack = resolveBookRewardTrack(book);
+  const rewardTrack = resolveBookRewardTrack(gameState, book);
 
   const nextSkills =
     rewardTrack === null

@@ -1,33 +1,46 @@
 import { ratedPcSlots, requiredPcSlots } from "../catalogs/pc-parts";
 import type {
   Book,
+  BookUnlockCondition,
   GameState,
   PcComponentCatalogItem,
   PlayerState,
   SkillState,
 } from "../types";
 
+function isUnlockConditionMet(condition: BookUnlockCondition, skills: SkillState): boolean {
+  const progress = skills.tracks[condition.track];
+  if (!progress) {
+    return false;
+  }
+
+  if (condition.minLevel && progress.level < condition.minLevel) {
+    return false;
+  }
+
+  if (condition.minPoints && progress.points < condition.minPoints) {
+    return false;
+  }
+
+  return true;
+}
+
 function isBookUnlocked(book: Book, skills: SkillState): boolean {
   if (!book.unlockRequirements) {
     return true;
   }
 
-  const { track, minLevel, minPoints } = book.unlockRequirements;
+  const { track, minLevel, minPoints, allOf, anyOf } = book.unlockRequirements;
 
-  if (!track) {
-    return true;
-  }
-
-  const progress = skills.tracks[track];
-  if (!progress) {
+  if (track && !isUnlockConditionMet({ track, minLevel, minPoints }, skills)) {
     return false;
   }
 
-  if (minLevel && progress.level < minLevel) {
+  if (allOf && !allOf.every((condition) => isUnlockConditionMet(condition, skills))) {
     return false;
   }
 
-  if (minPoints && progress.points < minPoints) {
+  if (anyOf && !anyOf.some((condition) => isUnlockConditionMet(condition, skills))) {
     return false;
   }
 
