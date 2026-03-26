@@ -146,6 +146,7 @@ type PlayerState = {
   ageYears: number
   money: number
   realEstateValue: number
+  propertyValue: number
   capital: number
   hunger: number
   health: number
@@ -153,18 +154,38 @@ type PlayerState = {
   fitness: number
   mood: number
   education: "university"
+  housingStatus: "with_parents" | "rent" | "own_home"
   isAlive: boolean
 }
 ```
 
 Пояснения:
 
-- `capital = money + realEstateValue`
+- `capital = money + realEstateValue + propertyValue`
+- `realEstateValue` хранит стоимость недвижимости героя
+- `propertyValue` хранит стоимость прочего имущества, которое тоже участвует в капитале
 - `hunger`, `health`, `fitness`, `mood` удобно хранить в шкале `0-100`
+- `housingStatus` фиксирует базовый жилищный статус героя и используется в бытовых и семейных ветках
+- `PlayerState` хранит только базовый персональный, жизненный и имущественный срез героя
+- навыки и прогресс специализаций лежат в `SkillState`
+- работа, должность, зарплата и поиск вакансий лежат в `CareerState`
+- друзья, отношения, семья, питомцы и прогулочные события лежат в `SocialState`
+- активные заказы и их награды лежат в `OrderState`
+- активные эффекты, таймеры и глобальные флаги прогресса лежат в `GameTimerState` и `MetaState`
 - старт:
   - `ageYears = 21`
   - `money = 1000`
+  - `realEstateValue = 0`
+  - `propertyValue = 0`
+  - `capital = 1000`
+  - `hunger = 20`
+  - `health = 100`
+  - `weight = 72`
+  - `fitness = 45`
+  - `mood = 65`
   - `education = "university"`
+  - `housingStatus = "with_parents"`
+  - `isAlive = true`
 
 Правила для голода и смерти в MVP:
 
