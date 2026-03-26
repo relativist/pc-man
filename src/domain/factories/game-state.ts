@@ -78,6 +78,7 @@ function createInitialPlayerState(playerName: string): PlayerState {
     ageYears: 21,
     money: 1000,
     realEstateValue: 0,
+    propertyValue: 0,
     capital: 1000,
     hunger: 20,
     health: 100,
@@ -85,6 +86,7 @@ function createInitialPlayerState(playerName: string): PlayerState {
     fitness: 45,
     mood: 65,
     education: "university",
+    housingStatus: "with_parents",
     isAlive: true,
   };
 }

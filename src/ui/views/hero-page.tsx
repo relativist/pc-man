@@ -9,6 +9,12 @@ const timerLabels = {
   healing: "Лечение",
 } as const;
 
+const housingLabels = {
+  with_parents: "С родителями",
+  rent: "Съемное жилье",
+  own_home: "Свое жилье",
+} as const;
+
 function getProgressTone(value: number): string {
   if (value >= 75) {
     return "good";
@@ -35,12 +41,36 @@ function getRiskTone(severity: "low" | "mid" | "high"): string {
 
 export function HeroPage() {
   const game = useGameStore((state) => state.game);
+  const livingPets = game.social.pets.filter((pet) => pet.isAlive);
+  const propertyValue = game.player.propertyValue + game.player.realEstateValue;
 
   const indicators = [
     { label: "Здоровье", value: game.player.health },
     { label: "Голод", value: 100 - game.player.hunger },
-    { label: "Форма", value: game.player.fitness },
+    { label: "Спорт", value: game.player.fitness },
     { label: "Настроение", value: game.player.mood },
+  ];
+
+  const heroProfile = [
+    { label: "Возраст", value: `${game.player.ageYears} лет` },
+    { label: "Вес", value: `${game.player.weight} кг` },
+    { label: "Образование", value: "IT-вышка" },
+    { label: "Жилье", value: housingLabels[game.player.housingStatus] },
+    {
+      label: "Семья",
+      value: game.social.spouse
+        ? `${game.social.spouse.name}, ${game.social.childrenCount} детей`
+        : game.social.childrenCount > 0
+          ? `${game.social.childrenCount} детей`
+          : "Пока без семьи",
+    },
+    {
+      label: "Питомцы",
+      value:
+        livingPets.length > 0
+          ? `${livingPets.length} активных из ${game.social.pets.length}`
+          : "Нет питомцев",
+    },
   ];
 
   const activeSpecialties = Object.values(game.skills.tracks)
@@ -115,7 +145,7 @@ export function HeroPage() {
         <p className="eyebrow">Главная / Герой</p>
         <h2>{game.player.name}</h2>
         <p className="lede">
-          Выпускник IT-направления, 21 год, стартует без работы и без собственного ПК.
+          Выпускник IT-направления, 21 год, стартует без работы, без собственного ПК и пока живет с родителями.
         </p>
 
         <div className="hero-metrics">
@@ -128,12 +158,12 @@ export function HeroPage() {
             <strong>{game.player.capital} K</strong>
           </div>
           <div>
-            <span className="metric-label">Недвижимость</span>
-            <strong>{game.player.realEstateValue} K</strong>
+            <span className="metric-label">Имущество</span>
+            <strong>{propertyValue} K</strong>
           </div>
           <div>
-            <span className="metric-label">Вес</span>
-            <strong>{game.player.weight} кг</strong>
+            <span className="metric-label">Жилье</span>
+            <strong>{housingLabels[game.player.housingStatus]}</strong>
           </div>
         </div>
       </div>
@@ -159,34 +189,14 @@ export function HeroPage() {
       </div>
 
       <div className="panel">
-        <h3>Состояние мира</h3>
+        <h3>Базовые характеристики</h3>
         <div className="stat-list">
-          <div className="stat-item">
-            <span>Занятость</span>
-            <strong>
-              {game.career.employmentStatus === "employed" ? "Работает" : "Ищет работу"}
-            </strong>
-          </div>
-          <div className="stat-item">
-            <span>Рабочий ПК</span>
-            <strong>{game.pc.isWorkingPcReady ? "Собран" : "Не собран"}</strong>
-          </div>
-          <div className="stat-item">
-            <span>Рейтинг ПК</span>
-            <strong>{game.pc.ratingScore}</strong>
-          </div>
-          <div className="stat-item">
-            <span>Друзья</span>
-            <strong>{game.social.friends.length}/20</strong>
-          </div>
-          <div className="stat-item">
-            <span>Питомцы</span>
-            <strong>{game.social.pets.length}/5</strong>
-          </div>
-          <div className="stat-item">
-            <span>Семья</span>
-            <strong>{game.social.childrenCount} детей</strong>
-          </div>
+          {heroProfile.map((item) => (
+            <div key={item.label} className="stat-item">
+              <span>{item.label}</span>
+              <strong>{item.value}</strong>
+            </div>
+          ))}
         </div>
       </div>
 

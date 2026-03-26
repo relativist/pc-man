@@ -34,8 +34,10 @@ function isBookUnlocked(book: Book, skills: SkillState): boolean {
   return true;
 }
 
-export function calculateCapital(player: Pick<PlayerState, "money" | "realEstateValue">): number {
-  return player.money + player.realEstateValue;
+export function calculateCapital(
+  player: Pick<PlayerState, "money" | "realEstateValue" | "propertyValue">,
+): number {
+  return player.money + player.realEstateValue + player.propertyValue;
 }
 
 export function calculatePcRatingScore(components: GameState["pc"]["components"]): number {
@@ -58,11 +60,22 @@ export function getPcPartById(
 }
 
 export function normalizeGameState(gameState: GameState): GameState {
+  const propertyValue = gameState.player.propertyValue ?? 0;
+  const housingStatus =
+    gameState.player.housingStatus ??
+    (gameState.player.realEstateValue > 0 ? "own_home" : "with_parents");
+
   return {
     ...gameState,
     player: {
       ...gameState.player,
-      capital: calculateCapital(gameState.player),
+      propertyValue,
+      housingStatus,
+      capital: calculateCapital({
+        money: gameState.player.money,
+        realEstateValue: gameState.player.realEstateValue,
+        propertyValue,
+      }),
     },
     learning: {
       ...gameState.learning,
