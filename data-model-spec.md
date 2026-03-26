@@ -82,6 +82,29 @@
 - проверка наступления `game over`;
 - пересчет производных состояний после завершения таймеров.
 
+Уточнение по классам систем:
+
+- пассивный прогресс не требует отдельного активного таймера на каждую систему;
+- таймерные процессы обязаны иметь явно хранимые `startedAt` / `endsAt`;
+- периодические пересчеты запускаются при догоне времени и после завершения таймеров.
+
+Формальный перечень time-dependent систем MVP:
+
+- `player.ageYears`;
+- `player.hunger`;
+- `player.health`;
+- `player.weight`;
+- `player.fitness`;
+- `player.mood`;
+- `learning.activeBookId` и `timers.learning`;
+- `career.jobSearchInProgress` и `timers.jobSearch`;
+- `career.monthlySalaryActual` и `timers.salaryCycle`;
+- `orders.activeOrderId` и `timers.activeOrder`;
+- `timers.walk` и социальные последствия прогулки;
+- `timers.healing` и последствия лечения;
+- `orders.lastRefreshAt` / `orders.nextRefreshAt`;
+- `meta.isGameOver` и `meta.gameOverReason`.
+
 ## 3. Корневой объект
 
 ```ts
