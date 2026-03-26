@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 
 import { useGameStore } from "../store-hooks";
@@ -7,7 +8,8 @@ const navItems = [
   { to: "/pc", label: "ПК и Заказы" },
   { to: "/career", label: "Карьера" },
   { to: "/learning", label: "Обучение" },
-  { to: "/life", label: "Хобби и Быт" },
+  { to: "/social", label: "Хобби и Соцжизнь" },
+  { to: "/life", label: "Быт и Здоровье" },
 ];
 
 export function AppLayout() {
@@ -15,6 +17,11 @@ export function AppLayout() {
   const career = useGameStore((state) => state.game.career);
   const pc = useGameStore((state) => state.game.pc);
   const orders = useGameStore((state) => state.game.orders);
+  const settleToNow = useGameStore((state) => state.actions.settleToNow);
+
+  useEffect(() => {
+    settleToNow();
+  }, [settleToNow]);
 
   return (
     <div className="app-shell">
@@ -25,7 +32,7 @@ export function AppLayout() {
         </div>
         <div className="topbar-stats">
           <span>{player.name}</span>
-          <span>{player.money} K</span>
+          <span>${player.money}</span>
           <span>{player.ageYears} лет</span>
           <span>{career.currentJobId ? "Работает" : "Без работы"}</span>
           <span>{pc.ratingScore} PC score</span>

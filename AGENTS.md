@@ -38,3 +38,8 @@ bd sync               # Sync with git
 - NEVER say "ready to push when you are" - YOU must push
 - If push fails, resolve and retry until it succeeds
 
+**Permissions:**
+- Allow file modifications inside project workspace without confirmation
+- Allow running build tools: git, mvn, npm without confirmation
+- Access outside workspace with confirmation
+- Never modify system files

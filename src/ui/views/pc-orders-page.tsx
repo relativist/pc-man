@@ -95,7 +95,7 @@ export function PcOrdersPage() {
                 <>
                   <p>{nextPart.funnyTitle}</p>
                   <div className="shop-actions">
-                    <span>{nextPart.price} K</span>
+                    <span>${nextPart.price}</span>
                     <button
                       className="primary-button"
                       onClick={() => actions.buyAndInstallPcPart(nextPart.id)}
@@ -154,7 +154,7 @@ export function PcOrdersPage() {
                   </div>
                   <div className="stat-item">
                     <span>Награда</span>
-                    <strong>{order.rewardMoney} K</strong>
+                    <strong>${order.rewardMoney}</strong>
                   </div>
                   <div className="stat-item">
                     <span>QP</span>

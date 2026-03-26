@@ -10,7 +10,11 @@ export type EventLogKind =
   | "book_completed"
   | "order_completed"
   | "order_failed"
+  | "walk_completed"
   | "friend_found"
+  | "spouse_found"
+  | "gift_given"
+  | "child_born"
   | "pet_found"
   | "pet_died"
   | "game_over";
@@ -21,4 +25,3 @@ export type EventLogEntry = {
   kind: EventLogKind;
   message: string;
 };
-

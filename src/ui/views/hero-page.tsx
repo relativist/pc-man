@@ -151,15 +151,15 @@ export function HeroPage() {
         <div className="hero-metrics">
           <div>
             <span className="metric-label">Деньги</span>
-            <strong>{game.player.money} K</strong>
+            <strong>${game.player.money}</strong>
           </div>
           <div>
             <span className="metric-label">Капитал</span>
-            <strong>{game.player.capital} K</strong>
+            <strong>${game.player.capital}</strong>
           </div>
           <div>
             <span className="metric-label">Имущество</span>
-            <strong>{propertyValue} K</strong>
+            <strong>${propertyValue}</strong>
           </div>
           <div>
             <span className="metric-label">Жилье</span>

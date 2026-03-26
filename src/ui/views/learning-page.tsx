@@ -50,7 +50,7 @@ export function LearningPage() {
         <div className="hero-metrics">
           <div>
             <span className="metric-label">Деньги</span>
-            <strong>{game.player.money} K</strong>
+            <strong>${game.player.money}</strong>
           </div>
           <div>
             <span className="metric-label">Куплено книг</span>
@@ -130,7 +130,7 @@ export function LearningPage() {
               <div className="stat-list compact-stats">
                 <div className="stat-item">
                   <span>Цена</span>
-                  <strong>{book.price} K</strong>
+                  <strong>${book.price}</strong>
                 </div>
                 <div className="stat-item">
                   <span>Длительность</span>

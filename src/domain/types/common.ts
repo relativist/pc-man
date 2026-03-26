@@ -1,6 +1,6 @@
 export type IsoDateString = string;
 
-export type Currency = "kotik";
+export type Currency = "usd";
 
 export type GameOverReason = "hunger" | "illness" | "old_age" | "other" | null;
 
@@ -45,4 +45,3 @@ export type TimerKind =
   | "order"
   | "walk"
   | "healing";
-
