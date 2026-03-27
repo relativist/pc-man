@@ -1,3 +1,4 @@
+import { getActivityProgress, useNow } from "../activity-progress";
 import { useGameStore } from "../store-hooks";
 
 const trackLabels: Record<string, string> = {
@@ -13,6 +14,7 @@ const trackLabels: Record<string, string> = {
 export function CareerPage() {
   const game = useGameStore((state) => state.game);
   const actions = useGameStore((state) => state.actions);
+  const now = useNow();
 
   const currentVacancy = game.career.currentJobId
     ? game.world.activeVacancies.find((vacancy) => vacancy.id === game.career.currentJobId) ?? null
@@ -21,6 +23,9 @@ export function CareerPage() {
   const searchResults = game.career.jobSearchResultIds
     .map((id) => game.world.activeVacancies.find((vacancy) => vacancy.id === id))
     .filter((vacancy): vacancy is NonNullable<typeof vacancy> => Boolean(vacancy));
+  const jobSearchProgress = game.timers.jobSearch
+    ? getActivityProgress(game.timers.jobSearch, now)
+    : null;
 
   return (
     <section className="page-grid">
@@ -121,21 +126,25 @@ export function CareerPage() {
             >
               Запустить поиск
             </button>
-            <button
-              className="primary-button"
-              onClick={() => actions.completeJobSearch()}
-              disabled={!game.career.jobSearchInProgress}
-            >
-              Завершить поиск
-            </button>
+            <span className="badge">
+              {game.career.jobSearchInProgress ? "Автозавершение включено" : "Ожидание старта"}
+            </span>
           </div>
         </div>
 
-        {game.timers.jobSearch ? (
+        {game.timers.jobSearch && jobSearchProgress ? (
           <div className="timer-card">
             <strong>Активный поиск работы</strong>
-            <p>Старт: {new Date(game.timers.jobSearch.startedAt).toLocaleString("ru-RU")}</p>
-            <p>Окончание: {new Date(game.timers.jobSearch.endsAt).toLocaleString("ru-RU")}</p>
+            <div className="progress-bar">
+              <div
+                className="progress-fill progress-mid"
+                style={{ width: `${jobSearchProgress.percent}%` }}
+              />
+            </div>
+            <p>Прогресс: {jobSearchProgress.percent}%</p>
+            <p className="muted">
+              Осталось примерно {jobSearchProgress.remainingLabel}. Результаты появятся автоматически.
+            </p>
           </div>
         ) : (
           <p className="muted">Сейчас таймер поиска работы не запущен.</p>

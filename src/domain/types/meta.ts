@@ -5,8 +5,8 @@ export type MetaState = {
   createdAt: IsoDateString;
   updatedAt: IsoDateString;
   lastOpenedAt: IsoDateString;
+  lastViewedLogAt: IsoDateString | null;
   saveSlotId: string;
   isGameOver: boolean;
   gameOverReason: GameOverReason;
 };
-

@@ -2,7 +2,9 @@ import { createStore } from "zustand/vanilla";
 
 import {
   acceptVacancy,
+  acceptPendingSocialEncounter,
   advanceGameState,
+  buyNextShopLot,
   buyBook,
   completeHealing,
   completeActiveBook,
@@ -14,6 +16,7 @@ import {
   installPcPart,
   normalizeGameState,
   refreshAvailableOrders,
+  rejectPendingSocialEncounter,
   resolveActiveOrder,
   acceptChildSuggestion,
   startHealing,
@@ -25,7 +28,7 @@ import {
   spouseGiftPrice,
   vacancyTemplates,
 } from "../domain";
-import type { EventLogEntry, GameState } from "../domain";
+import type { EventLogEntry, GameState, ShopSectionId } from "../domain";
 import type { CreateNewGameOptions } from "../domain/factories";
 
 export type GameStoreState = {
@@ -40,6 +43,7 @@ export type GameStoreState = {
     refreshOrders: (now?: Date) => void;
     startOrder: (orderId: string, now?: Date) => void;
     resolveActiveOrder: (randomValue?: number) => void;
+    buyNextShopLot: (section: ShopSectionId) => void;
     buyBook: (bookId: string) => void;
     startReadingBook: (bookId: string, now?: Date) => void;
     completeActiveBook: () => void;
@@ -54,6 +58,9 @@ export type GameStoreState = {
     completeWalk: () => void;
     giveSpouseGift: () => void;
     acceptChildSuggestion: () => void;
+    acceptPendingSocialEncounter: (encounterId: string) => void;
+    rejectPendingSocialEncounter: (encounterId: string) => void;
+    markNotificationsSeen: (seenAt?: string) => void;
     settleToNow: (now?: Date) => void;
   };
 };
@@ -73,6 +80,41 @@ function touchGameMeta(gameState: GameState, at: Date): GameState {
 
 function createLogEntryId(kind: EventLogEntry["kind"], at: Date): string {
   return `log-${kind}-${at.getTime()}`;
+}
+
+function getShopSectionLabel(section: ShopSectionId): string {
+  if (section === "housing") {
+    return "Жилье";
+  }
+
+  if (section === "transport") {
+    return "Транспорт";
+  }
+
+  return "Крутые вещи";
+}
+
+function getEncounterRejectedLog(
+  encounter: GameState["social"]["pendingEncounters"][number],
+): Pick<EventLogEntry, "kind" | "message"> {
+  if (encounter.kind === "friend") {
+    return {
+      kind: "friend_declined",
+      message: `Герой решил не продолжать знакомство с ${encounter.friend.name}.`,
+    };
+  }
+
+  if (encounter.kind === "spouse") {
+    return {
+      kind: "spouse_declined",
+      message: `История с ${encounter.spouse.name} осталась милым эпизодом прогулки без продолжения.`,
+    };
+  }
+
+  return {
+    kind: "pet_declined",
+    message: `${encounter.pet.species} ${encounter.pet.name} не переехал к герою и остался городской легендой.`,
+  };
 }
 
 function settleGame(gameState: GameState, now: Date): GameState {
@@ -203,11 +245,40 @@ export function createGameStore(options?: CreateNewGameOptions) {
           };
         });
       },
+      buyNextShopLot: (section) => {
+        const now = new Date();
+
+        set((state) => {
+          const settledGame = settleGame(state.game, now);
+          const lot = settledGame.world.shopCatalogs[section][settledGame.shop[section].nextLotIndex];
+          const nextGame = buyNextShopLot(settledGame, section);
+
+          return {
+            game: touchGameMeta(
+              {
+                ...nextGame,
+                logs: lot
+                  ? [
+                      {
+                        id: createLogEntryId("shop_purchase", now),
+                        at: now.toISOString(),
+                        kind: "shop_purchase",
+                        message: `Куплено в секции "${getShopSectionLabel(section)}": ${lot.title} за $${lot.price}.`,
+                      },
+                      ...nextGame.logs,
+                    ]
+                  : nextGame.logs,
+              },
+              now,
+            ),
+          };
+        });
+      },
       buyBook: (bookId) => {
         const now = new Date();
 
         set((state) => ({
-          game: touchGameMeta(buyBook(settleGame(state.game, now), bookId), now),
+          game: touchGameMeta(buyBook(settleGame(state.game, now), bookId, now), now),
         }));
       },
       startReadingBook: (bookId, now = new Date()) => {
@@ -421,6 +492,92 @@ export function createGameStore(options?: CreateNewGameOptions) {
                   },
                   ...settledGame.logs,
                 ],
+              },
+              now,
+            ),
+          };
+        });
+      },
+      acceptPendingSocialEncounter: (encounterId) => {
+        const now = new Date();
+
+        set((state) => {
+          const settledGame = settleGame(state.game, now);
+          if (!settledGame.social.pendingEncounters.some((item) => item.id === encounterId)) {
+            return { game: touchGameMeta(settledGame, now) };
+          }
+
+          const resolution = acceptPendingSocialEncounter(settledGame, encounterId);
+
+          return {
+            game: touchGameMeta(
+              {
+                ...resolution.game,
+                logs: [
+                  ...resolution.logs.map((entry, index) => ({
+                    id: createLogEntryId(entry.kind, new Date(now.getTime() + index)),
+                    at: new Date(now.getTime() + index).toISOString(),
+                    kind: entry.kind,
+                    message: entry.message,
+                  })),
+                  ...resolution.game.logs,
+                ],
+              },
+              now,
+            ),
+          };
+        });
+      },
+      rejectPendingSocialEncounter: (encounterId) => {
+        const now = new Date();
+
+        set((state) => {
+          const settledGame = settleGame(state.game, now);
+          const encounter = settledGame.social.pendingEncounters.find(
+            (item) => item.id === encounterId,
+          );
+
+          if (!encounter) {
+            return { game: touchGameMeta(settledGame, now) };
+          }
+
+          const nextGame = rejectPendingSocialEncounter(settledGame, encounterId);
+          const log = getEncounterRejectedLog(encounter);
+
+          return {
+            game: touchGameMeta(
+              {
+                ...nextGame,
+                logs: [
+                  {
+                    id: createLogEntryId(log.kind, now),
+                    at: now.toISOString(),
+                    kind: log.kind,
+                    message: log.message,
+                  },
+                  ...nextGame.logs,
+                ],
+              },
+              now,
+            ),
+          };
+        });
+      },
+      markNotificationsSeen: (seenAt) => {
+        const now = new Date();
+
+        set((state) => {
+          const settledGame = settleGame(state.game, now);
+          const latestSeenAt = seenAt ?? settledGame.logs[0]?.at ?? now.toISOString();
+
+          return {
+            game: touchGameMeta(
+              {
+                ...settledGame,
+                meta: {
+                  ...settledGame.meta,
+                  lastViewedLogAt: latestSeenAt,
+                },
               },
               now,
             ),

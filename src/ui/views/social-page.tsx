@@ -1,13 +1,18 @@
 import { maxFriends, maxPets, spouseGiftPrice } from "../../domain";
+import { getActivityProgress, useNow } from "../activity-progress";
 import { useGameStore } from "../store-hooks";
 
 const socialEventKinds = [
   "walk_completed",
   "friend_found",
+  "friend_declined",
   "spouse_found",
+  "spouse_declined",
+  "divorce",
   "gift_given",
   "child_born",
   "pet_found",
+  "pet_declined",
   "pet_died",
 ] as const;
 
@@ -19,12 +24,14 @@ function getPetAgeYears(acquiredAt: string): number {
 export function SocialPage() {
   const game = useGameStore((state) => state.game);
   const actions = useGameStore((state) => state.actions);
+  const now = useNow();
 
   const activeFriends = game.social.friends.filter((friend) => friend.isActive);
   const inactiveFriends = game.social.friends.filter((friend) => !friend.isActive);
   const livingPets = game.social.pets.filter((pet) => pet.isAlive);
   const departedPets = game.social.pets.filter((pet) => !pet.isAlive);
   const spouse = game.social.spouse;
+  const walkProgress = game.timers.walk ? getActivityProgress(game.timers.walk, now) : null;
   const recentSocialEvents = game.logs
     .filter((entry) =>
       socialEventKinds.includes(entry.kind as (typeof socialEventKinds)[number]),
@@ -61,6 +68,10 @@ export function SocialPage() {
             <span className="metric-label">Дети</span>
             <strong>{game.social.childrenCount}</strong>
           </div>
+          <div>
+            <span className="metric-label">Ждут решения</span>
+            <strong>{game.social.pendingEncounters.length}</strong>
+          </div>
         </div>
       </div>
 
@@ -80,26 +91,40 @@ export function SocialPage() {
             >
               Начать прогулку
             </button>
-            <button
-              className="primary-button"
-              onClick={() => actions.completeWalk()}
-              disabled={!game.timers.walk}
-            >
-              Завершить прогулку
-            </button>
+            <span className="badge">
+              {game.timers.walk ? "Автозавершение включено" : "Можно запускать"}
+            </span>
           </div>
         </div>
 
-        {game.timers.walk ? (
+        {game.timers.walk && walkProgress ? (
           <div className="timer-card">
             <strong>Активная прогулка</strong>
-            <p>Старт: {new Date(game.timers.walk.startedAt).toLocaleString("ru-RU")}</p>
-            <p>Окончание: {new Date(game.timers.walk.endsAt).toLocaleString("ru-RU")}</p>
+            <div className="progress-bar">
+              <div
+                className="progress-fill progress-good"
+                style={{ width: `${walkProgress.percent}%` }}
+              />
+            </div>
+            <p>Прогресс: {walkProgress.percent}%</p>
+            <p className="muted">
+              Осталось примерно {walkProgress.remainingLabel}. Итоги и новые знакомства прилетят
+              автоматически.
+            </p>
           </div>
         ) : (
-          <p className="muted">
-            Сейчас прогулка не запущена. Здесь же герой ищет друзей, питомцев и потенциальную супругу.
-          </p>
+          <div className="risk-list">
+            <p className="muted">
+              Сейчас прогулка не запущена. Здесь же герой ищет друзей, питомцев и потенциальную
+              супругу.
+            </p>
+            {game.social.pendingEncounters.length > 0 ? (
+              <p className="muted">
+                Новые знакомства уже ждут решения в модальном окне и не потеряются при переходе по
+                страницам.
+              </p>
+            ) : null}
+          </div>
         )}
       </div>
 

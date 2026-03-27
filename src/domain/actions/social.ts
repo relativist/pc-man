@@ -1,7 +1,17 @@
 import { createActivityTimer } from "../factories";
 import { convertGameDaysToMinutes } from "../rules";
 import { normalizeGameState } from "../utils";
-import type { EventLogKind, FriendState, GameState, PetState, SpouseState } from "../types";
+import type {
+  EventLogKind,
+  FriendState,
+  GameState,
+  PendingFriendEncounter,
+  PendingPetEncounter,
+  PendingSocialEncounter,
+  PendingSpouseEncounter,
+  PetState,
+  SpouseState,
+} from "../types";
 
 const walkDurationDays = 2;
 export const spouseGiftPrice = 180;
@@ -32,6 +42,29 @@ const spouseNames = [
   "Катя",
   "Полина",
 ];
+
+const jealousyDivorceStories = [
+  "Супруга увидела, как новый друг сходу занял ее любимую кружку, и объявила, что этот дом слишком мал для такой драмы.",
+  "После появления питомца супруга заявила, что в семье уже достаточно существ, которые игнорируют ее просьбы.",
+  "Новый знакомый слишком громко рассказывал про пассивный доход, и семейный чат сразу превратился в судебную хронику.",
+  "Питомец мгновенно лег на ее подушку, и это оказалось последней геополитической каплей.",
+  "Друг принес настолку на шесть часов, и супруга решила, что проще забрать имущество, чем переживать еще одну партию.",
+  "Питомец переел ее дизайнерскую зелень, после чего семейный бюджет и брак одновременно перестали быть общими.",
+  "Новый друг назвал роутер 'просто коробочкой', и супруга отказалась жить в такой атмосфере невежества.",
+  "Питомец занял ее сторону кровати увереннее, чем герой когда-либо занимал карьерную позицию.",
+  "Друг сходу предложил сделать барбекю на балконе, и супруга выбрала стратегию 'развод и конфискация'.",
+  "Питомец слишком быстро стал любимцем квартиры, и ревность оформилась в имущественный спор.",
+  "Новый знакомый предложил жить 'по кайфу и без таблиц', а супруга сочла это опасным культом.",
+  "Питомец однажды моргнул так осуждающе, что супруга предпочла выйти из проекта целиком.",
+  "Друг начал звать героя в спонтанные поездки, и семейный календарь сказал последнее слово через нотариуса.",
+  "Питомец ловко выбрал именно ее свитер для ежедневной линьки, и романтика умерла первой.",
+  "Новый знакомый слишком шутил про семейный бюджет, и бюджет неожиданно действительно разделили.",
+  "Питомец упорно слушался только героя, а супруга решила, что так жить унизительно даже для MVP.",
+  "Друг однажды произнес 'да зачем вам столько квадратных метров', и вопрос квадратных метров быстро сняли в суде.",
+  "Питомец освоил пассивно-агрессивное мяуканье ровно в интонации супружеских претензий.",
+  "Новый знакомый задержался на кухне до ночи с разговорами про стартап, и это было признано угрозой стабильности.",
+  "Питомец неожиданно стал получать больше тепла, чем семейный диалог, и развязка наступила мгновенно.",
+] as const;
 
 const petCatalog = [
   { species: "Кот", names: ["Патч", "Багет", "Кулер", "Пиксель", "Байт"] },
@@ -89,6 +122,11 @@ export type WalkResolution = {
   logs: SocialLogDraft[];
 };
 
+export type AcceptPendingSocialEncounterResult = {
+  game: GameState;
+  logs: SocialLogDraft[];
+};
+
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
@@ -138,6 +176,45 @@ function createPet(now: Date, roll: number): PetState {
     acquiredAt: now.toISOString(),
     expectedLifeYears: roll >= 0.5 ? 3 : 2,
     isAlive: true,
+  };
+}
+
+function createFriendEncounter(now: Date, roll: number): PendingFriendEncounter {
+  const friend = createFriend(now, roll);
+
+  return {
+    id: buildId("friend-encounter", now, friend.id),
+    kind: "friend",
+    createdAt: now.toISOString(),
+    title: "Новое знакомство",
+    story: `${friend.name} заметил на лавке твой задумчивый взгляд в монитор без монитора и предложил дружить по интересам, багам и случайным подработкам.`,
+    friend,
+  };
+}
+
+function createSpouseEncounter(now: Date, roll: number): PendingSpouseEncounter {
+  const spouse = createSpouse(now, roll);
+
+  return {
+    id: buildId("spouse-encounter", now, spouse.id),
+    kind: "spouse",
+    createdAt: now.toISOString(),
+    title: "Судьбоносное знакомство",
+    story: `${spouse.name} засмеялась над шуткой про Excel, сервера и ипотеку. Похоже, это подозрительно хороший старт для семейной ветки.`,
+    spouse,
+  };
+}
+
+function createPetEncounter(now: Date, roll: number): PendingPetEncounter {
+  const pet = createPet(now, roll);
+
+  return {
+    id: buildId("pet-encounter", now, pet.id),
+    kind: "pet",
+    createdAt: now.toISOString(),
+    title: "Новый питомец",
+    story: `${pet.species} ${pet.name} смотрит так, будто уже решил переехать к тебе и захватить половину дивана, миску и душевное равновесие.`,
+    pet,
   };
 }
 
@@ -192,6 +269,49 @@ function createRollReader(rolls: number[] = []): () => number {
   };
 }
 
+function createSeededUnit(seed: string): number {
+  let hash = 0;
+
+  for (let index = 0; index < seed.length; index += 1) {
+    hash = (hash * 31 + seed.charCodeAt(index)) >>> 0;
+  }
+
+  return (hash % 10_000) / 10_000;
+}
+
+function countPendingEncounters(
+  encounters: PendingSocialEncounter[],
+  kind: PendingSocialEncounter["kind"],
+): number {
+  return encounters.filter((encounter) => encounter.kind === kind).length;
+}
+
+function createAcceptedEncounterLog(encounter: PendingSocialEncounter): SocialLogDraft {
+  if (encounter.kind === "friend") {
+    return {
+      kind: "friend_found",
+      message: `Герой принял знакомство с ${encounter.friend.name}. Теперь это друг с потенциалом до 3 заказов.`,
+    };
+  }
+
+  if (encounter.kind === "spouse") {
+    return {
+      kind: "spouse_found",
+      message: `Герой решил продолжить историю с ${encounter.spouse.name}. Семейная ветка официально началась.`,
+    };
+  }
+
+  return {
+    kind: "pet_found",
+    message: `${encounter.pet.species} ${encounter.pet.name} теперь живет с героем на постоянной основе.`,
+  };
+}
+
+function getDivorceStory(seed: string): string {
+  const roll = createSeededUnit(seed);
+  return jealousyDivorceStories[Math.min(jealousyDivorceStories.length - 1, Math.floor(roll * jealousyDivorceStories.length))];
+}
+
 export function startWalk(gameState: GameState, now: Date = new Date()): GameState {
   if (gameState.timers.walk) {
     throw new Error("Walk already in progress");
@@ -222,27 +342,36 @@ export function completeWalk(
   const petRoll = takeRoll();
 
   const nextFriend =
-    gameState.social.friends.length < maxFriends && friendRoll < 0.32
-      ? createFriend(now, friendRoll)
+    gameState.social.friends.length + countPendingEncounters(gameState.social.pendingEncounters, "friend") <
+      maxFriends && friendRoll < 0.32
+      ? createFriendEncounter(now, friendRoll)
       : null;
 
   const nextSpouse =
-    gameState.social.spouse === null && spouseRoll < 0.15
-      ? createSpouse(now, spouseRoll)
+    gameState.social.spouse === null &&
+    countPendingEncounters(gameState.social.pendingEncounters, "spouse") === 0 &&
+    spouseRoll < 0.15
+      ? createSpouseEncounter(now, spouseRoll)
       : null;
 
   const nextPet =
-    gameState.social.pets.filter((pet) => pet.isAlive).length < maxPets && petRoll < 0.22
-      ? createPet(now, petRoll)
+    gameState.social.pets.filter((pet) => pet.isAlive).length +
+      countPendingEncounters(gameState.social.pendingEncounters, "pet") <
+      maxPets && petRoll < 0.22
+      ? createPetEncounter(now, petRoll)
       : null;
 
-  const petsWithNewArrival = nextPet ? [...gameState.social.pets, nextPet] : gameState.social.pets;
-  const { pets: resolvedPets, deceasedPets } = resolvePetStatus(petsWithNewArrival, now, takeRoll);
+  const { pets: resolvedPets, deceasedPets } = resolvePetStatus(gameState.social.pets, now, takeRoll);
 
   const nextMoney = clamp(gameState.player.money + outcome.moneyDelta, 0, 1_000_000);
   const nextHealth = clamp(gameState.player.health + outcome.healthDelta, 0, 100);
   const nextMood = clamp(
-    gameState.player.mood + outcome.moodDelta + (nextFriend ? 4 : 0) + (nextSpouse ? 6 : 0) + (nextPet ? 5 : 0) - deceasedPets.length * 10,
+    gameState.player.mood +
+      outcome.moodDelta +
+      (nextFriend ? 4 : 0) +
+      (nextSpouse ? 6 : 0) +
+      (nextPet ? 5 : 0) -
+      deceasedPets.length * 10,
     0,
     100,
   );
@@ -260,9 +389,13 @@ export function completeWalk(
     },
     social: {
       ...gameState.social,
-      spouse: nextSpouse ?? gameState.social.spouse,
-      friends: nextFriend ? [...gameState.social.friends, nextFriend] : gameState.social.friends,
       pets: resolvedPets,
+      pendingEncounters: [
+        ...gameState.social.pendingEncounters,
+        ...[nextFriend, nextSpouse, nextPet].filter(
+          (encounter): encounter is PendingSocialEncounter => Boolean(encounter),
+        ),
+      ],
     },
     timers: {
       ...gameState.timers,
@@ -280,21 +413,21 @@ export function completeWalk(
   if (nextFriend) {
     logs.push({
       kind: "friend_found",
-      message: `На прогулке появился новый знакомый: ${nextFriend.name}. Он сможет подкинуть до 3 заказов.`,
+      message: `На прогулке появился новый знакомый: ${nextFriend.friend.name}. Знакомство ждет подтверждения.`,
     });
   }
 
   if (nextSpouse) {
     logs.push({
       kind: "spouse_found",
-      message: `Герой познакомился с ${nextSpouse.name}. Похоже, социальная ветка начинает приносить дивиденды.`,
+      message: `Герой познакомился с ${nextSpouse.spouse.name}. Реши, продолжать ли эту социальную историю.`,
     });
   }
 
   if (nextPet) {
     logs.push({
       kind: "pet_found",
-      message: `Домой напросился новый питомец: ${nextPet.species} по имени ${nextPet.name}.`,
+      message: `Домой напрашивается ${nextPet.pet.species} по имени ${nextPet.pet.name}. Нужно принять решение.`,
     });
   }
 
@@ -309,6 +442,124 @@ export function completeWalk(
     game: nextState,
     logs,
   };
+}
+
+export function acceptPendingSocialEncounter(
+  gameState: GameState,
+  encounterId: string,
+  randomValue: number = Math.random(),
+): AcceptPendingSocialEncounterResult {
+  const encounter = gameState.social.pendingEncounters.find((item) => item.id === encounterId);
+
+  if (!encounter) {
+    throw new Error(`Pending encounter not found: ${encounterId}`);
+  }
+
+  const pendingEncounters = gameState.social.pendingEncounters.filter(
+    (item) => item.id !== encounterId,
+  );
+  const hadSpouse = Boolean(gameState.social.spouse);
+  const acceptedLog = createAcceptedEncounterLog(encounter);
+  let nextState: GameState;
+
+  if (encounter.kind === "friend") {
+    nextState = normalizeGameState({
+      ...gameState,
+      social: {
+        ...gameState.social,
+        friends: [...gameState.social.friends, encounter.friend],
+        pendingEncounters,
+      },
+    });
+  } else if (encounter.kind === "spouse") {
+    if (gameState.social.spouse) {
+      throw new Error("Spouse already exists");
+    }
+
+    nextState = normalizeGameState({
+      ...gameState,
+      social: {
+        ...gameState.social,
+        spouse: encounter.spouse,
+        pendingEncounters,
+      },
+    });
+  } else {
+    nextState = normalizeGameState({
+      ...gameState,
+      social: {
+        ...gameState.social,
+        pets: [...gameState.social.pets, encounter.pet],
+        pendingEncounters,
+      },
+    });
+  }
+
+  if (!hadSpouse || encounter.kind === "spouse" || randomValue >= 0.05) {
+    return {
+      game: nextState,
+      logs: [acceptedLog],
+    };
+  }
+
+  const story = getDivorceStory(`${encounter.id}-${gameState.social.spouse?.id ?? "none"}`);
+  const divorceState = normalizeGameState({
+    ...nextState,
+    player: {
+      ...nextState.player,
+      money: Math.floor(nextState.player.money / 2),
+    },
+    shop: {
+      things: {
+        currentLotId: null,
+        nextLotIndex: 0,
+      },
+      housing: {
+        currentLotId: null,
+        nextLotIndex: 0,
+      },
+      transport: {
+        currentLotId: null,
+        nextLotIndex: 0,
+      },
+    },
+    social: {
+      ...nextState.social,
+      spouse: null,
+    },
+  });
+
+  return {
+    game: divorceState,
+    logs: [
+      acceptedLog,
+      {
+        kind: "divorce",
+        message: `${story} Супруга ушла, забрав все жилье, транспорт, крутые вещи и половину наличных денег.`,
+      },
+    ],
+  };
+}
+
+export function rejectPendingSocialEncounter(
+  gameState: GameState,
+  encounterId: string,
+): GameState {
+  const encounter = gameState.social.pendingEncounters.find((item) => item.id === encounterId);
+
+  if (!encounter) {
+    throw new Error(`Pending encounter not found: ${encounterId}`);
+  }
+
+  return normalizeGameState({
+    ...gameState,
+    social: {
+      ...gameState.social,
+      pendingEncounters: gameState.social.pendingEncounters.filter(
+        (item) => item.id !== encounterId,
+      ),
+    },
+  });
 }
 
 export function giveSpouseGift(gameState: GameState): GameState {

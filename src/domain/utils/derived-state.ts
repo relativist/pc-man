@@ -1,3 +1,4 @@
+import { shopCatalogs } from "../catalogs";
 import { ratedPcSlots, requiredPcSlots } from "../catalogs/pc-parts";
 import type {
   Book,
@@ -7,6 +8,16 @@ import type {
   PlayerState,
   SkillState,
 } from "../types";
+
+function getOwnedShopLot(
+  gameState: GameState,
+  section: keyof GameState["shop"],
+) {
+  const currentLotId = gameState.shop[section].currentLotId;
+  return currentLotId
+    ? gameState.world.shopCatalogs[section].find((lot) => lot.id === currentLotId) ?? null
+    : null;
+}
 
 function isUnlockConditionMet(condition: BookUnlockCondition, skills: SkillState): boolean {
   const progress = skills.tracks[condition.track];
@@ -73,31 +84,65 @@ export function getPcPartById(
 }
 
 export function normalizeGameState(gameState: GameState): GameState {
-  const propertyValue = gameState.player.propertyValue ?? 0;
+  const isLegacyShopState = !gameState.shop;
+  const normalizedShop = gameState.shop ?? {
+    things: { currentLotId: null, nextLotIndex: 0 },
+    housing: { currentLotId: null, nextLotIndex: 0 },
+    transport: { currentLotId: null, nextLotIndex: 0 },
+  };
+  const shopGameState = {
+    ...gameState,
+    shop: normalizedShop,
+    world: {
+      ...gameState.world,
+      shopCatalogs: gameState.world.shopCatalogs ?? shopCatalogs,
+    },
+  };
+  const currentHousing = getOwnedShopLot(shopGameState, "housing");
+  const currentThing = getOwnedShopLot(shopGameState, "things");
+  const currentTransport = getOwnedShopLot(shopGameState, "transport");
+  const realEstateValue = currentHousing?.value ?? (isLegacyShopState ? gameState.player.realEstateValue ?? 0 : 0);
+  const propertyValue =
+    (currentThing?.value ?? 0) +
+    (currentTransport?.value ?? 0) +
+    (isLegacyShopState && !currentThing && !currentTransport ? gameState.player.propertyValue ?? 0 : 0);
   const housingStatus =
-    gameState.player.housingStatus ??
-    (gameState.player.realEstateValue > 0 ? "own_home" : "with_parents");
+    currentHousing?.housingStatus ??
+    (isLegacyShopState ? gameState.player.housingStatus : undefined) ??
+    (realEstateValue > 0 ? "own_home" : "with_parents");
 
   return {
-    ...gameState,
+    ...shopGameState,
+    meta: {
+      ...shopGameState.meta,
+      lastViewedLogAt:
+        shopGameState.meta.lastViewedLogAt ??
+        shopGameState.logs[0]?.at ??
+        shopGameState.meta.updatedAt,
+    },
     player: {
-      ...gameState.player,
+      ...shopGameState.player,
+      realEstateValue,
       propertyValue,
       housingStatus,
       capital: calculateCapital({
-        money: gameState.player.money,
-        realEstateValue: gameState.player.realEstateValue,
+        money: shopGameState.player.money,
+        realEstateValue,
         propertyValue,
       }),
     },
+    social: {
+      ...shopGameState.social,
+      pendingEncounters: shopGameState.social.pendingEncounters ?? [],
+    },
     learning: {
-      ...gameState.learning,
-      availableBookIds: getAvailableBookIds(gameState.world.availableBooks, gameState.skills),
+      ...shopGameState.learning,
+      availableBookIds: getAvailableBookIds(shopGameState.world.availableBooks, shopGameState.skills),
     },
     pc: {
-      ...gameState.pc,
-      isWorkingPcReady: isWorkingPcReady(gameState.pc.components),
-      ratingScore: calculatePcRatingScore(gameState.pc.components),
+      ...shopGameState.pc,
+      isWorkingPcReady: isWorkingPcReady(shopGameState.pc.components),
+      ratingScore: calculatePcRatingScore(shopGameState.pc.components),
     },
   };
 }

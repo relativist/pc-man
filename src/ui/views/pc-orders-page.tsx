@@ -30,6 +30,9 @@ export function PcOrdersPage() {
   const visibleOrders = game.orders.availableOrderIds
     .map((id) => game.world.orderPool.find((order) => order.id === id))
     .filter((order): order is NonNullable<typeof order> => Boolean(order));
+  const activeOrder = game.orders.activeOrderId
+    ? game.world.orderPool.find((order) => order.id === game.orders.activeOrderId) ?? null
+    : null;
 
   return (
     <section className="page-grid pc-grid">
@@ -66,54 +69,6 @@ export function PcOrdersPage() {
       </div>
 
       <div className="panel">
-        <div className="section-head">
-          <div>
-            <h3>Сборка и апгрейды</h3>
-            <p className="muted">Покупка сразу ставит компонент в слот.</p>
-          </div>
-          <button className="secondary-button" onClick={() => actions.refreshOrders()}>
-            Обновить заказы
-          </button>
-        </div>
-
-        <div className="shop-list">
-          {nextPartsBySlot.map(({ slot, installed, installedPart, nextPart }) => (
-            <article key={slot} className="shop-card">
-              <div>
-                <p className="eyebrow">{formatSlotName(slot)}</p>
-                <h4>
-                  {installedPart?.funnyTitle ?? "Слот пуст"}
-                </h4>
-                <p className="muted">
-                  Текущий уровень: {installed?.level ?? 0}
-                  {" · "}
-                  Очки: {installed?.score ?? 0}
-                </p>
-              </div>
-
-              {nextPart ? (
-                <>
-                  <p>{nextPart.funnyTitle}</p>
-                  <div className="shop-actions">
-                    <span>${nextPart.price}</span>
-                    <button
-                      className="primary-button"
-                      onClick={() => actions.buyAndInstallPcPart(nextPart.id)}
-                      disabled={game.player.money < nextPart.price}
-                    >
-                      Купить
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <p className="muted">Для этого слота достигнут потолок каталога.</p>
-              )}
-            </article>
-          ))}
-        </div>
-      </div>
-
-      <div className="panel wide-panel">
         <div className="section-head">
           <div>
             <h3>Доступные заказы</h3>
@@ -182,7 +137,55 @@ export function PcOrdersPage() {
         )}
       </div>
 
-      <div className="panel wide-panel">
+      <div className="panel">
+        <div className="section-head">
+          <div>
+            <h3>Сборка и апгрейды</h3>
+            <p className="muted">Покупка сразу ставит компонент в слот.</p>
+          </div>
+          <button className="secondary-button" onClick={() => actions.refreshOrders()}>
+            Обновить заказы
+          </button>
+        </div>
+
+        <div className="shop-list">
+          {nextPartsBySlot.map(({ slot, installed, installedPart, nextPart }) => (
+            <article key={slot} className="shop-card">
+              <div>
+                <p className="eyebrow">{formatSlotName(slot)}</p>
+                <h4>
+                  {installedPart?.funnyTitle ?? "Слот пуст"}
+                </h4>
+                <p className="muted">
+                  Текущий уровень: {installed?.level ?? 0}
+                  {" · "}
+                  Очки: {installed?.score ?? 0}
+                </p>
+              </div>
+
+              {nextPart ? (
+                <>
+                  <p>{nextPart.funnyTitle}</p>
+                  <div className="shop-actions">
+                    <span>${nextPart.price}</span>
+                    <button
+                      className="primary-button"
+                      onClick={() => actions.buyAndInstallPcPart(nextPart.id)}
+                      disabled={game.player.money < nextPart.price}
+                    >
+                      Купить
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <p className="muted">Для этого слота достигнут потолок каталога.</p>
+              )}
+            </article>
+          ))}
+        </div>
+      </div>
+
+      <div className="panel">
         <div className="section-head">
           <div>
             <h3>Активный заказ</h3>
@@ -197,13 +200,21 @@ export function PcOrdersPage() {
           </button>
         </div>
 
-        {game.orders.activeOrderId ? (
-          <div className="active-order-banner">
-            <strong>В работе: {game.orders.activeOrderId}</strong>
-            <span>
-              Таймер: {game.timers.activeOrder?.startedAt ?? "не запущен"} →{" "}
-              {game.timers.activeOrder?.endsAt ?? "не запущен"}
-            </span>
+        {activeOrder ? (
+          <div className="risk-list">
+            <article className="active-order-banner">
+              <strong>В работе: {activeOrder.title}</strong>
+              <span>{activeOrder.funnyTitle}</span>
+            </article>
+            <article className="timer-card">
+              <p>Награда: ${activeOrder.rewardMoney}</p>
+              <p>QP: +{activeOrder.rewardQualificationPoints}</p>
+              <p>Риск провала: {activeOrder.failureChancePct}%</p>
+              <p>
+                Таймер: {game.timers.activeOrder?.startedAt ?? "не запущен"} →{" "}
+                {game.timers.activeOrder?.endsAt ?? "не запущен"}
+              </p>
+            </article>
           </div>
         ) : (
           <p className="muted">Сейчас нет активного разового заказа.</p>

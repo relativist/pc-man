@@ -6,6 +6,7 @@ import type { OrderState } from "./orders";
 import type { PcState } from "./pc";
 import type { PlayerState } from "./player";
 import type { SkillState } from "./skills";
+import type { ShopState } from "./shop";
 import type { SocialState } from "./social";
 import type { TimerState } from "./timers";
 import type { WorldState } from "./world";
@@ -18,9 +19,9 @@ export type GameState = {
   learning: LearningState;
   pc: PcState;
   orders: OrderState;
+  shop: ShopState;
   social: SocialState;
   world: WorldState;
   timers: TimerState;
   logs: EventLogEntry[];
 };
-

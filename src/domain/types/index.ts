@@ -8,7 +8,7 @@ export * from "./orders";
 export * from "./pc";
 export * from "./player";
 export * from "./skills";
+export * from "./shop";
 export * from "./social";
 export * from "./timers";
 export * from "./world";
-

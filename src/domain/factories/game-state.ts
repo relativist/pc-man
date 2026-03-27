@@ -1,4 +1,4 @@
-import { books, companies, orderTemplates, pcPartsCatalog } from "../catalogs";
+import { books, companies, orderTemplates, pcPartsCatalog, shopCatalogs } from "../catalogs";
 import { selectVisibleOrders } from "../rules";
 import { normalizeGameState } from "../utils";
 import type {
@@ -10,6 +10,7 @@ import type {
   PcComponentSlot,
   PlayerState,
   QualificationProgress,
+  ShopState,
   SkillState,
   SkillTrackId,
   TimerState,
@@ -36,6 +37,49 @@ const pcSlots: PcComponentSlot[] = [
   "mouse",
 ];
 
+const firstNames = [
+  "Артемий",
+  "Леонид",
+  "Марк",
+  "Виталя",
+  "Гриша",
+  "Костя",
+  "Роман",
+  "Тимур",
+  "Семен",
+  "Денис",
+  "Игорь",
+  "Павел",
+];
+
+const lastNames = [
+  "Логов",
+  "Багоделов",
+  "Тестирович",
+  "Спринтов",
+  "Кодобоев",
+  "Релизов",
+  "Фичин",
+  "Дедлайнов",
+  "Деплойкин",
+  "Кабелян",
+  "Мониторцев",
+  "Рефакторский",
+];
+
+const educationLabels = [
+  "Академия грустных релизов",
+  "Университет прикладного героизма в Excel",
+  "Институт кабелей, кофе и дедлайнов",
+  "Высшая школа сурового фронтенда",
+  "Колледж тревожного DevOps",
+  "Техникум внезапных продакшен-фиксов",
+  "Факультет тестирования всего живого",
+  "Университет случайных архитектурных решений",
+  "Институт мягких навыков и жестких багов",
+  "Школа системного волшебства имени сервера №7",
+];
+
 function toIsoDate(date: Date): string {
   return date.toISOString();
 }
@@ -46,6 +90,21 @@ function addMinutes(date: Date, minutes: number): Date {
 
 function createId(prefix: string, value: string): string {
   return `${prefix}-${value}`;
+}
+
+function createSeededUnit(seed: string): number {
+  let hash = 0;
+
+  for (let index = 0; index < seed.length; index += 1) {
+    hash = (hash * 33 + seed.charCodeAt(index)) >>> 0;
+  }
+
+  return (hash % 10_000) / 10_000;
+}
+
+function pickBySeed<T>(items: readonly T[], seed: string): T {
+  const roll = createSeededUnit(seed);
+  return items[Math.min(items.length - 1, Math.floor(roll * items.length))];
 }
 
 function createQualificationProgress(track: SkillTrackId): QualificationProgress {
@@ -71,10 +130,12 @@ function createInitialSkills(): SkillState {
   };
 }
 
-function createInitialPlayerState(playerName: string): PlayerState {
+function createInitialPlayerState(playerName: string | undefined, seed: string): PlayerState {
+  const generatedName = `${pickBySeed(firstNames, `${seed}-first`)} ${pickBySeed(lastNames, `${seed}-last`)}`;
+
   return {
     id: createId("player", "1"),
-    name: playerName,
+    name: playerName ?? generatedName,
     ageYears: 21,
     money: 1000,
     realEstateValue: 0,
@@ -85,7 +146,7 @@ function createInitialPlayerState(playerName: string): PlayerState {
     weight: 72,
     fitness: 45,
     mood: 65,
-    education: "university",
+    education: pickBySeed(educationLabels, `${seed}-education`),
     housingStatus: "with_parents",
     isAlive: true,
   };
@@ -140,6 +201,23 @@ function createInitialOrdersState(now: Date, orderPool: WorldState["orderPool"])
   };
 }
 
+function createInitialShopState(): ShopState {
+  return {
+    things: {
+      currentLotId: null,
+      nextLotIndex: 0,
+    },
+    housing: {
+      currentLotId: null,
+      nextLotIndex: 0,
+    },
+    transport: {
+      currentLotId: null,
+      nextLotIndex: 0,
+    },
+  };
+}
+
 function createInitialTimers(): TimerState {
   return {
     learning: null,
@@ -161,6 +239,11 @@ function createInitialWorldState(): WorldState {
       ...template,
       id: createId("order", String(index + 1)),
     })),
+    shopCatalogs: {
+      things: [...shopCatalogs.things],
+      housing: [...shopCatalogs.housing],
+      transport: [...shopCatalogs.transport],
+    },
   };
 }
 
@@ -186,6 +269,7 @@ export function createActivityTimer(
 export function createInitialGameState(options: CreateNewGameOptions = {}): GameState {
   const now = options.now ?? new Date();
   const saveSlotId = options.saveSlotId ?? "slot-1";
+  const identitySeed = `${saveSlotId}-${toIsoDate(now)}`;
   const world = createInitialWorldState();
   const skills = createInitialSkills();
   const initialState = normalizeGameState({
@@ -194,21 +278,24 @@ export function createInitialGameState(options: CreateNewGameOptions = {}): Game
       createdAt: toIsoDate(now),
       updatedAt: toIsoDate(now),
       lastOpenedAt: toIsoDate(now),
+      lastViewedLogAt: toIsoDate(now),
       saveSlotId,
       isGameOver: false,
       gameOverReason: null,
     },
-    player: createInitialPlayerState(options.playerName ?? "Новый герой"),
+    player: createInitialPlayerState(options.playerName, identitySeed),
     career: createInitialCareerState(),
     skills,
     learning: createInitialLearningState(world.availableBooks),
     pc: createInitialPcState(),
     orders: createInitialOrdersState(now, world.orderPool),
+    shop: createInitialShopState(),
     social: {
       spouse: null,
       childrenCount: 0,
       friends: [],
       pets: [],
+      pendingEncounters: [],
     },
     world,
     timers: createInitialTimers(),

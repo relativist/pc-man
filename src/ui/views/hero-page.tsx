@@ -1,3 +1,4 @@
+import type { GameState } from "../../domain";
 import { useGameStore } from "../store-hooks";
 
 const timerLabels = {
@@ -14,6 +15,16 @@ const housingLabels = {
   rent: "Съемное жилье",
   own_home: "Свое жилье",
 } as const;
+
+function getOwnedShopLot(
+  game: GameState,
+  section: "things" | "housing" | "transport",
+) {
+  const currentLotId = game.shop[section].currentLotId;
+  return currentLotId
+    ? game.world.shopCatalogs[section].find((lot) => lot.id === currentLotId) ?? null
+    : null;
+}
 
 function getProgressTone(value: number): string {
   if (value >= 75) {
@@ -43,6 +54,9 @@ export function HeroPage() {
   const game = useGameStore((state) => state.game);
   const livingPets = game.social.pets.filter((pet) => pet.isAlive);
   const propertyValue = game.player.propertyValue + game.player.realEstateValue;
+  const currentHousing = getOwnedShopLot(game, "housing");
+  const currentTransport = getOwnedShopLot(game, "transport");
+  const currentThing = getOwnedShopLot(game, "things");
 
   const indicators = [
     { label: "Здоровье", value: game.player.health },
@@ -53,8 +67,8 @@ export function HeroPage() {
 
   const heroProfile = [
     { label: "Возраст", value: `${game.player.ageYears} лет` },
-    { label: "Вес", value: `${game.player.weight} кг` },
-    { label: "Образование", value: "IT-вышка" },
+    { label: "Вес", value: `${Math.round(game.player.weight)} кг` },
+    { label: "Образование", value: game.player.education },
     { label: "Жилье", value: housingLabels[game.player.housingStatus] },
     {
       label: "Семья",
@@ -145,7 +159,8 @@ export function HeroPage() {
         <p className="eyebrow">Главная / Герой</p>
         <h2>{game.player.name}</h2>
         <p className="lede">
-          Выпускник IT-направления, 21 год, стартует без работы, без собственного ПК и пока живет с родителями.
+          Герой строит карьеру, собирает активы и постепенно меняет уровень жизни от стартового
+          быта к более солидной версии себя.
         </p>
 
         <div className="hero-metrics">
@@ -197,6 +212,32 @@ export function HeroPage() {
               <strong>{item.value}</strong>
             </div>
           ))}
+        </div>
+      </div>
+
+      <div className="panel wide-panel">
+        <div className="section-head">
+          <div>
+            <h3>Имущество героя</h3>
+            <p className="muted">
+              Здесь видны актуальные крупные покупки из магазина: дом, транспорт и заметная вещь.
+            </p>
+          </div>
+          <span className="badge">${propertyValue}</span>
+        </div>
+        <div className="stat-list compact-stats">
+          <div className="stat-item">
+            <span>Жилье</span>
+            <strong>{currentHousing?.title ?? "Пока без покупки"}</strong>
+          </div>
+          <div className="stat-item">
+            <span>Транспорт</span>
+            <strong>{currentTransport?.title ?? "Пока пешком"}</strong>
+          </div>
+          <div className="stat-item">
+            <span>Крутая вещь</span>
+            <strong>{currentThing?.title ?? "Пусто"}</strong>
+          </div>
         </div>
       </div>
 

@@ -8,6 +8,12 @@ function getBookById(gameState: GameState, bookId: string): Book | undefined {
   return gameState.world.availableBooks.find((book) => book.id === bookId);
 }
 
+function getOwnedUnreadBookIds(gameState: GameState): string[] {
+  return gameState.learning.ownedBookIds.filter(
+    (ownedBookId) => !gameState.learning.completedBookIds.includes(ownedBookId),
+  );
+}
+
 function resolveUniversalBookRewardTrack(gameState: GameState): SkillTrackId {
   if (gameState.career.currentTrack && gameState.career.currentTrack !== "cto") {
     return gameState.career.currentTrack;
@@ -42,10 +48,12 @@ function resolveBookRewardTrack(gameState: GameState, book: Book): SkillTrackId 
 
 export function canAffordBook(gameState: GameState, bookId: string): boolean {
   const book = getBookById(gameState, bookId);
-  return Boolean(book && gameState.player.money >= book.price);
+  const hasPendingBook = getOwnedUnreadBookIds(gameState).length > 0;
+
+  return Boolean(book && gameState.player.money >= book.price && !hasPendingBook);
 }
 
-export function buyBook(gameState: GameState, bookId: string): GameState {
+export function buyBook(gameState: GameState, bookId: string, now: Date = new Date()): GameState {
   const book = getBookById(gameState, bookId);
 
   if (!book) {
@@ -58,6 +66,10 @@ export function buyBook(gameState: GameState, bookId: string): GameState {
 
   if (gameState.learning.ownedBookIds.includes(bookId)) {
     return gameState;
+  }
+
+  if (getOwnedUnreadBookIds(gameState).length > 0) {
+    throw new Error("Finish the current book before buying another one");
   }
 
   if (gameState.player.money < book.price) {
@@ -73,6 +85,16 @@ export function buyBook(gameState: GameState, bookId: string): GameState {
     learning: {
       ...gameState.learning,
       ownedBookIds: [...gameState.learning.ownedBookIds, bookId],
+      activeBookId: bookId,
+    },
+    timers: {
+      ...gameState.timers,
+      learning: createActivityTimer(
+        "learning",
+        now,
+        convertGameDaysToMinutes(book.durationDays),
+        bookId,
+      ),
     },
   });
 }

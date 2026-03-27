@@ -25,10 +25,42 @@ export type PetState = {
   isAlive: boolean;
 };
 
+export type PendingFriendEncounter = {
+  id: string;
+  kind: "friend";
+  createdAt: IsoDateString;
+  title: string;
+  story: string;
+  friend: FriendState;
+};
+
+export type PendingSpouseEncounter = {
+  id: string;
+  kind: "spouse";
+  createdAt: IsoDateString;
+  title: string;
+  story: string;
+  spouse: SpouseState;
+};
+
+export type PendingPetEncounter = {
+  id: string;
+  kind: "pet";
+  createdAt: IsoDateString;
+  title: string;
+  story: string;
+  pet: PetState;
+};
+
+export type PendingSocialEncounter =
+  | PendingFriendEncounter
+  | PendingSpouseEncounter
+  | PendingPetEncounter;
+
 export type SocialState = {
   spouse: SpouseState | null;
   childrenCount: number;
   friends: FriendState[];
   pets: PetState[];
+  pendingEncounters: PendingSocialEncounter[];
 };
-

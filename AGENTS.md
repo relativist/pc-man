@@ -43,3 +43,5 @@ bd sync               # Sync with git
 - Allow running build tools: git, mvn, npm without confirmation
 - Access outside workspace with confirmation
 - Never modify system files
+
+Не делать комитов, пока не попросят.

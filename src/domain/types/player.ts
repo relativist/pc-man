@@ -13,7 +13,7 @@ export type PlayerState = {
   weight: number;
   fitness: number;
   mood: number;
-  education: "university";
+  education: string;
   housingStatus: HousingStatus;
   isAlive: boolean;
 };

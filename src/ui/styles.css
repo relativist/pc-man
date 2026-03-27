@@ -59,6 +59,12 @@ button {
   margin-bottom: 24px;
 }
 
+.topbar-controls {
+  display: grid;
+  gap: 12px;
+  justify-items: end;
+}
+
 .topbar h1,
 .panel h2,
 .panel h3,
@@ -104,6 +110,18 @@ button {
   border-color: rgba(255, 216, 111, 0.5);
   background: rgba(242, 170, 76, 0.12);
   color: var(--accent-strong);
+}
+
+.notification-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(242, 170, 76, 0.24);
+  background: rgba(242, 170, 76, 0.08);
+  color: #ecf3e6;
+  border-radius: 999px;
+  padding: 10px 14px;
+  cursor: pointer;
 }
 
 .app-body {
@@ -276,6 +294,97 @@ button {
   gap: 12px;
 }
 
+.learning-section-grid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 18px;
+}
+
+.learning-section {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+
+.learning-section h4 {
+  margin: 0;
+}
+
+.notification-drawer {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  width: min(360px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  display: grid;
+  gap: 16px;
+  padding: 22px;
+  border-radius: 28px;
+  background: rgba(10, 15, 18, 0.94);
+  border: 1px solid rgba(142, 202, 230, 0.18);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(24px);
+  transform: translateX(calc(100% + 36px));
+  transition: transform 180ms ease;
+  z-index: 20;
+}
+
+.notification-drawer-open {
+  transform: translateX(0);
+}
+
+.notification-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.notification-list {
+  display: grid;
+  gap: 12px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.notification-item {
+  gap: 8px;
+}
+
+.notification-item-unread {
+  border-color: rgba(242, 170, 76, 0.34);
+  background: rgba(242, 170, 76, 0.08);
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(5, 8, 10, 0.7);
+  backdrop-filter: blur(8px);
+  z-index: 30;
+}
+
+.modal-card {
+  width: min(560px, 100%);
+  display: grid;
+  gap: 16px;
+  padding: 24px;
+  border-radius: 28px;
+  background: linear-gradient(180deg, rgba(20, 29, 33, 0.98), rgba(12, 18, 20, 0.98));
+  border: 1px solid rgba(242, 170, 76, 0.24);
+  box-shadow: 0 24px 90px rgba(0, 0, 0, 0.42);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
 .chip {
   min-width: 160px;
   padding: 12px 14px;
@@ -398,6 +507,7 @@ button {
 @media (max-width: 1080px) {
   .app-body,
   .page-grid,
+  .learning-section-grid,
   .pc-grid {
     grid-template-columns: 1fr;
   }
@@ -413,10 +523,31 @@ button {
   }
 
   .topbar,
+  .topbar-controls,
   .section-head,
   .badge-row,
-  .shop-actions {
+  .shop-actions,
+  .notification-head,
+  .modal-actions {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .topbar-controls {
+    justify-items: stretch;
+  }
+
+  .notification-drawer {
+    top: auto;
+    right: 16px;
+    left: 16px;
+    bottom: 16px;
+    width: auto;
+    max-height: min(70vh, 540px);
+    transform: translateY(calc(100% + 24px));
+  }
+
+  .notification-drawer-open {
+    transform: translateY(0);
   }
 }
