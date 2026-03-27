@@ -1,10 +1,10 @@
-import { books as currentBookCatalog, shopCatalogs } from "../catalogs";
-import { ratedPcSlots, requiredPcSlots } from "../catalogs/pc-parts";
+import { books as currentBookCatalog, orderTemplates, pcTierCatalog, shopCatalogs } from "../catalogs";
 import type {
   Book,
   BookUnlockCondition,
   GameState,
-  PcComponentCatalogItem,
+  Order,
+  PcTierCatalogItem,
   PlayerState,
   SkillState,
 } from "../types";
@@ -17,6 +17,51 @@ function getOwnedShopLot(
   return currentLotId
     ? gameState.world.shopCatalogs[section].find((lot) => lot.id === currentLotId) ?? null
     : null;
+}
+
+function createCurrentOrderPool(): Order[] {
+  return orderTemplates.map((template, index) => ({
+    ...template,
+    id: `order-${index + 1}`,
+  }));
+}
+
+function getOrderMigrationKey(order: Pick<Order, "track" | "level" | "title" | "funnyTitle">): string {
+  return `${order.track}::${order.level}::${order.title}::${order.funnyTitle}`;
+}
+
+function createOrderIdRemap(
+  savedOrderPool: Order[] | undefined,
+  currentOrderPool: Order[],
+): Map<string, string> {
+  const currentByKey = new Map(
+    currentOrderPool.map((order) => [getOrderMigrationKey(order), order.id]),
+  );
+
+  return new Map(
+    (savedOrderPool ?? [])
+      .map((order) => {
+        const nextId = currentByKey.get(getOrderMigrationKey(order));
+        return nextId ? ([order.id, nextId] as const) : null;
+      })
+      .filter((entry): entry is readonly [string, string] => Boolean(entry)),
+  );
+}
+
+function remapOrderIdList(ids: string[] | undefined, idRemap: Map<string, string>): string[] {
+  const remappedIds = (ids ?? [])
+    .map((id) => idRemap.get(id))
+    .filter((id): id is string => Boolean(id));
+
+  return Array.from(new Set(remappedIds));
+}
+
+function remapOrderId(id: string | null | undefined, idRemap: Map<string, string>): string | null {
+  if (!id) {
+    return null;
+  }
+
+  return idRemap.get(id) ?? null;
 }
 
 function isUnlockConditionMet(condition: BookUnlockCondition, skills: SkillState): boolean {
@@ -64,30 +109,102 @@ export function calculateCapital(
   return player.money + player.realEstateValue + player.propertyValue;
 }
 
-export function calculatePcRatingScore(components: GameState["pc"]["components"]): number {
-  return ratedPcSlots.reduce((total, slot) => total + (components[slot]?.score ?? 0), 0);
+export function calculatePcRatingScore(build: PcTierCatalogItem | null): number {
+  return build?.score ?? 0;
 }
 
-export function calculatePcLevel(components: GameState["pc"]["components"]): number {
-  return requiredPcSlots.reduce((lowestLevel, slot) => {
-    const componentLevel = components[slot]?.level ?? 0;
-    return Math.min(lowestLevel, componentLevel);
-  }, Number.POSITIVE_INFINITY);
+export function calculatePcLevel(build: PcTierCatalogItem | null): number {
+  return build?.level ?? 0;
 }
 
-export function isWorkingPcReady(components: GameState["pc"]["components"]): boolean {
-  return requiredPcSlots.every((slot) => components[slot] !== null);
+export function isWorkingPcReady(build: PcTierCatalogItem | null): boolean {
+  return build !== null;
 }
 
 export function getAvailableBookIds(books: Book[], skills: SkillState): string[] {
   return books.filter((book) => isBookUnlocked(book, skills)).map((book) => book.id);
 }
 
-export function getPcPartById(
-  partsCatalog: PcComponentCatalogItem[],
-  itemId: string,
-): PcComponentCatalogItem | undefined {
-  return partsCatalog.find((item) => item.id === itemId);
+function getClosestPcTier(
+  availablePcTiers: PcTierCatalogItem[],
+  targetLevel: number,
+  targetScore: number,
+): PcTierCatalogItem | null {
+  if (availablePcTiers.length === 0) {
+    return null;
+  }
+
+  return availablePcTiers.reduce((bestTier, tier) => {
+    const bestScoreDistance = Math.abs(bestTier.score - targetScore);
+    const tierScoreDistance = Math.abs(tier.score - targetScore);
+
+    if (tierScoreDistance !== bestScoreDistance) {
+      return tierScoreDistance < bestScoreDistance ? tier : bestTier;
+    }
+
+    const bestLevelDistance = Math.abs(bestTier.level - targetLevel);
+    const tierLevelDistance = Math.abs(tier.level - targetLevel);
+
+    if (tierLevelDistance !== bestLevelDistance) {
+      return tierLevelDistance < bestLevelDistance ? tier : bestTier;
+    }
+
+    return tier.level > bestTier.level ? tier : bestTier;
+  }, availablePcTiers[0]);
+}
+
+function normalizePcState(
+  rawPc: GameState["pc"] & {
+    components?: Record<string, { level?: number; score?: number } | null>;
+  },
+  availablePcTiers: PcTierCatalogItem[],
+): GameState["pc"] {
+  const currentTierId = rawPc.currentTierId ?? rawPc.currentBuild?.id ?? null;
+  const currentBuild =
+    currentTierId
+      ? availablePcTiers.find((tier) => tier.id === currentTierId) ?? null
+      : null;
+
+  if (currentBuild) {
+    return {
+      isWorkingPcReady: isWorkingPcReady(currentBuild),
+      level: calculatePcLevel(currentBuild),
+      ratingScore: calculatePcRatingScore(currentBuild),
+      currentTierId: currentBuild.id,
+      currentBuild,
+    };
+  }
+
+  const legacyComponents = Object.values(rawPc.components ?? {});
+  const legacyLevels = legacyComponents
+    .map((component) => component?.level ?? 0)
+    .filter((level) => level > 0);
+  const legacyScoreFromComponents = legacyComponents.reduce(
+    (sum, component) => sum + (component?.score ?? 0),
+    0,
+  );
+  const legacyLevel =
+    rawPc.level > 0
+      ? rawPc.level
+      : legacyLevels.length > 0
+        ? Math.min(...legacyLevels)
+        : 0;
+  const legacyScore =
+    rawPc.ratingScore > 0
+      ? rawPc.ratingScore
+      : legacyScoreFromComponents;
+  const migratedBuild =
+    legacyLevel > 0 || legacyScore > 0
+      ? getClosestPcTier(availablePcTiers, legacyLevel, legacyScore)
+      : null;
+
+  return {
+    isWorkingPcReady: isWorkingPcReady(migratedBuild),
+    level: calculatePcLevel(migratedBuild),
+    ratingScore: calculatePcRatingScore(migratedBuild),
+    currentTierId: migratedBuild?.id ?? null,
+    currentBuild: migratedBuild,
+  };
 }
 
 export function normalizeGameState(gameState: GameState): GameState {
@@ -97,15 +214,49 @@ export function normalizeGameState(gameState: GameState): GameState {
     housing: { currentLotId: null, nextLotIndex: 0 },
     transport: { currentLotId: null, nextLotIndex: 0 },
   };
+  const currentOrderPool = createCurrentOrderPool();
+  const currentPcTiers = gameState.world.availablePcTiers ?? pcTierCatalog;
+  const orderIdRemap = createOrderIdRemap(gameState.world.orderPool, currentOrderPool);
+  const remappedActiveOrderId = remapOrderId(gameState.orders.activeOrderId, orderIdRemap);
+  const remappedOrderTimer =
+    gameState.timers.activeOrder && remappedActiveOrderId
+      ? {
+          ...gameState.timers.activeOrder,
+          referenceId: remappedActiveOrderId,
+        }
+      : null;
+
   const shopGameState = {
     ...gameState,
     shop: normalizedShop,
     world: {
       ...gameState.world,
       availableBooks: [...currentBookCatalog],
+      availablePcTiers: [...currentPcTiers],
+      orderPool: currentOrderPool,
       shopCatalogs: gameState.world.shopCatalogs ?? shopCatalogs,
     },
+    orders: {
+      ...gameState.orders,
+      activeOrderId: remappedActiveOrderId,
+      activeOrderSource: gameState.orders.activeOrderSource ?? null,
+      availableOrderIds: remapOrderIdList(gameState.orders.availableOrderIds, orderIdRemap),
+      discoveredOrderIds: remapOrderIdList(gameState.orders.discoveredOrderIds, orderIdRemap),
+      completedOrderIds: remapOrderIdList(gameState.orders.completedOrderIds, orderIdRemap),
+      failedOrderIds: remapOrderIdList(gameState.orders.failedOrderIds, orderIdRemap),
+    },
+    pc: normalizePcState(
+      gameState.pc as typeof gameState.pc & {
+        components?: Record<string, { level?: number; score?: number } | null>;
+      },
+      currentPcTiers,
+    ),
+    timers: {
+      ...gameState.timers,
+      activeOrder: remappedOrderTimer,
+    },
   };
+
   const currentHousing = getOwnedShopLot(shopGameState, "housing");
   const currentThing = getOwnedShopLot(shopGameState, "things");
   const currentTransport = getOwnedShopLot(shopGameState, "transport");
@@ -141,17 +292,26 @@ export function normalizeGameState(gameState: GameState): GameState {
     },
     social: {
       ...shopGameState.social,
+      friends: (shopGameState.social.friends ?? []).filter(
+        (friend) => friend.isActive !== false && friend.ordersGivenCount < friend.maxOrdersGiven,
+      ),
       pendingEncounters: shopGameState.social.pendingEncounters ?? [],
+      friendOrderRotationIndex: shopGameState.social.friendOrderRotationIndex ?? 0,
     },
     learning: {
       ...shopGameState.learning,
       availableBookIds: getAvailableBookIds(shopGameState.world.availableBooks, shopGameState.skills),
     },
-    pc: {
-      ...shopGameState.pc,
-      isWorkingPcReady: isWorkingPcReady(shopGameState.pc.components),
-      level: calculatePcLevel(shopGameState.pc.components),
-      ratingScore: calculatePcRatingScore(shopGameState.pc.components),
+    orders: {
+      ...shopGameState.orders,
+      activeOrderSource: shopGameState.orders.activeOrderSource ?? null,
+      discoveredOrderIds: shopGameState.orders.discoveredOrderIds ?? [],
     },
+    pc: normalizePcState(
+      shopGameState.pc as typeof shopGameState.pc & {
+        components?: Record<string, { level?: number; score?: number } | null>;
+      },
+      shopGameState.world.availablePcTiers,
+    ),
   };
 }

@@ -80,9 +80,13 @@ function clearAllTimers(gameState: GameState): GameState {
   };
 }
 
-function resolveGameOverReason(gameState: GameState): GameOverReason {
+export function resolveGameOverReason(gameState: GameState): GameOverReason {
   if (gameState.player.hunger >= 100) {
     return "hunger";
+  }
+
+  if (gameState.player.weight > 100) {
+    return "obesity";
   }
 
   if (gameState.player.health <= 0) {
@@ -121,6 +125,8 @@ function finalizeGameOver(gameState: GameState, reason: Exclude<GameOverReason, 
         "game_over",
         reason === "hunger"
           ? "Герой умер от голода. Бытовая часть была полностью проигнорирована."
+          : reason === "obesity"
+            ? "Герой умер от ожирения. Вес перевалил за 100 кг, и организм не выдержал."
           : reason === "illness"
             ? "Герой умер из-за критического состояния здоровья."
             : "Герой умер от старости и износа организма.",
@@ -130,14 +136,41 @@ function finalizeGameOver(gameState: GameState, reason: Exclude<GameOverReason, 
   };
 }
 
+export function applyGameOverIfNeeded(gameState: GameState, at: Date = new Date()): GameState {
+  const normalizedGame = normalizeGameState(gameState);
+
+  if (normalizedGame.meta.isGameOver || !normalizedGame.player.isAlive) {
+    return normalizedGame;
+  }
+
+  const reason = resolveGameOverReason(normalizedGame);
+  if (!reason) {
+    return normalizedGame;
+  }
+
+  const result = finalizeGameOver(normalizedGame, reason, at);
+  return appendLogs(result.game, result.logs);
+}
+
 function applyPassiveLifeProgress(gameState: GameState, from: Date, to: Date): AdvanceDraft {
   const elapsedMinutes = Math.max(0, (to.getTime() - from.getTime()) / minuteMs);
 
-  if (elapsedMinutes <= 0 || gameState.meta.isGameOver || !gameState.player.isAlive) {
+  if (gameState.meta.isGameOver || !gameState.player.isAlive) {
     return {
       game: gameState,
       logs: [],
     };
+  }
+
+  if (elapsedMinutes <= 0) {
+    const reason = resolveGameOverReason(gameState);
+
+    return reason
+      ? finalizeGameOver(gameState, reason, to)
+      : {
+          game: gameState,
+          logs: [],
+        };
   }
 
   const ageYears = Number((gameState.player.ageYears + elapsedMinutes / 10).toFixed(1));
@@ -293,7 +326,7 @@ function processWalk(gameState: GameState, at: Date): AdvanceDraft {
   }
 
   const baseSeed = `${gameState.timers.walk.id}-${at.toISOString()}`;
-  const rolls = [0, 1, 2, 3, 4, 5].map((offset) =>
+  const rolls = Array.from({ length: 20 }, (_, offset) =>
     createSeededUnit(`${baseSeed}-${offset}`),
   );
   const resolution = completeWalk(gameState, at, rolls);
@@ -379,12 +412,13 @@ function processDueTimers(gameState: GameState, at: Date): AdvanceDraft {
 }
 
 export function advanceGameState(gameState: GameState, now: Date = new Date()): GameState {
-  if (gameState.meta.isGameOver || !gameState.player.isAlive) {
-    return normalizeGameState(gameState);
+  let nextGame = applyGameOverIfNeeded(gameState, now);
+
+  if (nextGame.meta.isGameOver || !nextGame.player.isAlive) {
+    return nextGame;
   }
 
-  let cursor = getLastOpenedAt(gameState);
-  let nextGame = normalizeGameState(gameState);
+  let cursor = getLastOpenedAt(nextGame);
 
   if (cursor.getTime() > now.getTime()) {
     return nextGame;
@@ -405,12 +439,16 @@ export function advanceGameState(gameState: GameState, now: Date = new Date()): 
     }
 
     const dueResult = processDueTimers(nextGame, nextDueTime);
-    nextGame = dueResult.game;
+    nextGame = applyGameOverIfNeeded(dueResult.game, nextDueTime);
     cursor = nextDueTime;
+
+    if (nextGame.meta.isGameOver || !nextGame.player.isAlive) {
+      return refreshAvailableOrders(nextGame, nextDueTime);
+    }
   }
 
   const finalPassive = applyPassiveLifeProgress(nextGame, cursor, now);
-  nextGame = appendLogs(finalPassive.game, finalPassive.logs);
+  nextGame = applyGameOverIfNeeded(appendLogs(finalPassive.game, finalPassive.logs), now);
 
   return refreshAvailableOrders(nextGame, now);
 }

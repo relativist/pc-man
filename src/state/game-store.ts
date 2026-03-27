@@ -3,6 +3,7 @@ import { createStore } from "zustand/vanilla";
 import {
   acceptVacancy,
   acceptPendingSocialEncounter,
+  applyGameOverIfNeeded,
   advanceGameState,
   buyNextShopLot,
   buyBook,
@@ -13,8 +14,9 @@ import {
   doWorkout,
   eatMeal,
   giveSpouseGift,
-  installPcPart,
+  upgradePcTier,
   normalizeGameState,
+  hasFriendOrderMarketAccess,
   meetsOrderPcRequirements,
   meetsOrderQualificationRequirements,
   refreshAvailableOrders,
@@ -41,7 +43,7 @@ export type GameStoreState = {
     patchGame: (updater: (gameState: GameState) => GameState) => void;
     setPlayerName: (name: string) => void;
     appendLog: (entry: Omit<EventLogEntry, "id" | "at"> & Partial<Pick<EventLogEntry, "id" | "at">>) => void;
-    buyAndInstallPcPart: (itemId: string) => void;
+    buyNextPcTier: () => void;
     refreshOrders: (now?: Date) => void;
     startOrder: (orderId: string, now?: Date) => void;
     resolveActiveOrder: (randomValue?: number) => void;
@@ -138,6 +140,10 @@ function getOrderRefreshMessage(previousGame: GameState, nextGame: GameState): s
     return "Пул заказов обновлен. Новых заказов не появилось.";
   }
 
+  if (!hasFriendOrderMarketAccess(nextGame) && nextGame.orders.discoveredOrderIds.length === 0) {
+    return "Новых заказов нет: сначала найди друзей или принеси заказ с прогулки.";
+  }
+
   if (!nextGame.pc.isWorkingPcReady) {
     return "Новых заказов нет: сначала собери рабочий ПК.";
   }
@@ -161,6 +167,10 @@ function getOrderRefreshMessage(previousGame: GameState, nextGame: GameState): s
 
   if (qualificationBlocked) {
     return "Новых заказов нет: не хватает квалификации.";
+  }
+
+  if (nextGame.orders.discoveredOrderIds.length > 0) {
+    return "Пул заказов обновлен. Сейчас доступны найденные на прогулках заказы.";
   }
 
   return "Пул заказов обновлен. Новых заказов не появилось.";
@@ -245,12 +255,12 @@ export function createGameStore(options?: CreateNewGameOptions) {
           };
         });
       },
-      buyAndInstallPcPart: (itemId) => {
+      buyNextPcTier: () => {
         const now = new Date();
 
         set((state) => ({
           game: touchGameMeta(
-            refreshAvailableOrders(installPcPart(settleGame(state.game, now), itemId), now),
+            upgradePcTier(settleGame(state.game, now), now),
             now,
           ),
         }));
@@ -447,7 +457,7 @@ export function createGameStore(options?: CreateNewGameOptions) {
         const now = new Date();
 
         set((state) => ({
-          game: touchGameMeta(eatMeal(settleGame(state.game, now)), now),
+          game: touchGameMeta(applyGameOverIfNeeded(eatMeal(settleGame(state.game, now)), now), now),
         }));
       },
       doWorkout: () => {
@@ -507,21 +517,7 @@ export function createGameStore(options?: CreateNewGameOptions) {
           const settledGame = settleGame(state.game, now);
 
           return {
-            game: touchGameMeta(
-              {
-                ...giveSpouseGift(settledGame),
-                logs: [
-                  {
-                    id: createLogEntryId("gift_given", now),
-                    at: now.toISOString(),
-                    kind: "gift_given",
-                    message: `Подарок супруге куплен за $${spouseGiftPrice}. Отношения стали теплее.`,
-                  },
-                  ...settledGame.logs,
-                ],
-              },
-              now,
-            ),
+            game: touchGameMeta(giveSpouseGift(settledGame), now),
           };
         });
       },

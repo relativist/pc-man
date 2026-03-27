@@ -61,7 +61,7 @@ export function CareerPage() {
         </div>
       </div>
 
-      <div className="panel compact-panel">
+      <div className="panel compact-panel wide-panel">
         <div className="section-head">
           <div>
             <div className="title-with-help">
@@ -72,6 +72,13 @@ export function CareerPage() {
           <div className="badge-row">
             {game.career.jobSearchInProgress ? <span className="badge">Поиск идет</span> : null}
             {game.career.promotionAvailable ? <span className="badge">Можно просить повышение</span> : null}
+            <button
+              className="primary-button"
+              onClick={() => actions.startJobSearch()}
+              disabled={game.career.jobSearchInProgress}
+            >
+              Запустить поиск
+            </button>
           </div>
         </div>
 
@@ -84,21 +91,21 @@ export function CareerPage() {
             </div>
             <h4>{currentVacancy.formalTitle}</h4>
             <p>{currentVacancy.funnyTitle}</p>
-            <div className="stat-list compact-stats">
+            <div className="pc-spec-list">
               <div className="stat-item">
-                <span>Компания</span>
-                <strong>
+                <strong>Компания</strong>
+                <span>
                   {game.world.companies.find((company) => company.id === currentVacancy.companyId)?.name ??
                     currentVacancy.companyId}
-                </strong>
+                </span>
               </div>
               <div className="stat-item">
-                <span>База</span>
-                <strong>${currentVacancy.baseSalary}</strong>
+                <strong>База</strong>
+                <span>${currentVacancy.baseSalary}</span>
               </div>
               <div className="stat-item">
-                <span>Итог</span>
-                <strong>${currentVacancy.finalSalary}</strong>
+                <strong>Итог</strong>
+                <span>${currentVacancy.finalSalary}</span>
               </div>
             </div>
           </div>
@@ -107,29 +114,6 @@ export function CareerPage() {
             Герой пока без работы. Ниже можно запустить поиск и выбрать один из офферов.
           </p>
         )}
-      </div>
-
-      <div className="panel compact-panel">
-        <div className="section-head">
-          <div>
-            <div className="title-with-help">
-              <h3>Поиск работы</h3>
-              <InfoHint text="Поиск занимает 1-3 игровых дня и должен принести от 1 до 3 вакансий." />
-            </div>
-          </div>
-          <div className="badge-row">
-            <button
-              className="primary-button"
-              onClick={() => actions.startJobSearch()}
-              disabled={game.career.jobSearchInProgress}
-            >
-              Запустить поиск
-            </button>
-            {game.career.jobSearchInProgress ? (
-              <span className="badge">Автозавершение включено</span>
-            ) : null}
-          </div>
-        </div>
 
         {game.timers.jobSearch && jobSearchProgress ? (
           <div className="timer-card">
@@ -160,37 +144,37 @@ export function CareerPage() {
             </p>
           </div>
         ) : (
-          <div className="order-list">
+          <div className="vacancy-grid">
             {searchResults.map((vacancy) => {
               const company = game.world.companies.find(
                 (item) => item.id === vacancy.companyId,
               );
 
               return (
-                <article key={vacancy.id} className="order-card compact-card">
+                <article key={vacancy.id} className="order-card compact-card vacancy-card">
                   <div className="order-meta">
                     <span className="badge">{trackLabels[vacancy.track] ?? vacancy.track}</span>
                     <span className="badge">ступень {vacancy.careerLevel}</span>
                     {vacancy.isGolden ? <span className="badge gold-badge">gold</span> : null}
                   </div>
                   <h4>{vacancy.formalTitle}</h4>
-                  <p>{vacancy.funnyTitle}</p>
-                  <div className="stat-list compact-stats">
+                  <p className="muted compact-copy">{vacancy.funnyTitle}</p>
+                  <div className="pc-spec-list">
                     <div className="stat-item">
-                      <span>Компания</span>
-                      <strong>{company?.name ?? vacancy.companyId}</strong>
+                      <strong>Компания</strong>
+                      <span>{company?.name ?? vacancy.companyId}</span>
                     </div>
                     <div className="stat-item">
-                      <span>Оклад</span>
-                      <strong>${vacancy.finalSalary}</strong>
+                      <strong>Оклад</strong>
+                      <span>${vacancy.finalSalary}</span>
                     </div>
                     <div className="stat-item">
-                      <span>Мин. lvl</span>
-                      <strong>{vacancy.requirements.requiredQualificationLevel}</strong>
+                      <strong>Нужен lvl</strong>
+                      <span>{vacancy.requirements.requiredQualificationLevel}</span>
                     </div>
                     <div className="stat-item">
-                      <span>Мин. QP</span>
-                      <strong>{vacancy.requirements.requiredQualificationPoints ?? 0}</strong>
+                      <strong>Нужен QP</strong>
+                      <span>{vacancy.requirements.requiredQualificationPoints ?? 0}</span>
                     </div>
                   </div>
                   <button

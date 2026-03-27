@@ -1,6 +1,7 @@
 import { createActivityTimer } from "../factories";
 import { convertGameDaysToMinutes } from "../rules";
 import { normalizeGameState } from "../utils";
+import { discoverOrderFromWalk } from "./orders";
 import type {
   EventLogKind,
   FriendState,
@@ -18,6 +19,11 @@ export const spouseGiftPrice = 180;
 export const maxFriends = 20;
 export const maxPets = 5;
 export const maxChildren = 4;
+const walkSocialEncounterChance = 0.65;
+const friendEncounterWeight = 1;
+const spouseEncounterWeight = 1;
+const petEncounterWeight = 1;
+const firstPetEncounterWeight = 2.4;
 
 const friendNames = [
   "Леха из локалки",
@@ -112,6 +118,22 @@ const walkOutcomes = [
   },
 ] as const;
 
+const walkMoneyFindStories = [
+  "Герой нашел купюры в кармане старой ветровки и понял, что иногда лучший инвестор это забывчивость.",
+  "Из автомата выпал лишний кэшбэк наличкой, будто районный бог экономики моргнул именно в эту минуту.",
+  "Под скамейкой лежала смятая заначка, которую явно потерял человек с менее развитой внимательностью.",
+  "Сосед вернул древний долг за 'пять минут настроить Wi-Fi', хотя прошло примерно три сезона и одна эпоха.",
+  "В куртке обнаружился аварийный резерв, спрятанный героем так надежно, что он сам его не мог найти.",
+] as const;
+
+const walkMoneyLossStories = [
+  "Герой взял кофе на прогулке, потом булочку, потом еще какую-то 'полезную мелочь', и бюджет ушел в закат.",
+  "Уличный музыкант играл так убедительно, что кошелек задонатил раньше мозга.",
+  "В киоске внезапно продали лимонад, снеки и чувство финансовой безответственности одним чеком.",
+  "Герой решил, что магнитик 'я просто вышел подышать' жизненно необходим, и деньги это решение не пережили.",
+  "По пути случилась спонтанная покупка уровня 'ну смешная же штука', и наличка выбрала свободу.",
+] as const;
+
 type SocialLogDraft = {
   kind: EventLogKind;
   message: string;
@@ -143,6 +165,39 @@ function pickByRoll<T>(items: readonly T[], roll: number): T {
 function getGameYearsSince(isoDate: string, now: Date): number {
   const elapsedMinutes = Math.max(0, now.getTime() - new Date(isoDate).getTime()) / 60_000;
   return elapsedMinutes / 10;
+}
+
+function createWalkMoneyIncident(
+  currentMoney: number,
+  takeRoll: () => number,
+): { moneyDelta: number; message: string } | null {
+  if (takeRoll() >= 0.42) {
+    return null;
+  }
+
+  const isGain = takeRoll() < 0.5;
+  const amount = 100 + Math.floor(takeRoll() * 101);
+
+  if (isGain) {
+    const story = pickByRoll(walkMoneyFindStories, takeRoll());
+
+    return {
+      moneyDelta: amount,
+      message: `${story} Найдено $${amount}.`,
+    };
+  }
+
+  const actualLoss = Math.min(amount, currentMoney);
+  if (actualLoss <= 0) {
+    return null;
+  }
+
+  const story = pickByRoll(walkMoneyLossStories, takeRoll());
+
+  return {
+    moneyDelta: -actualLoss,
+    message: `${story} Потеряно $${actualLoss}.`,
+  };
 }
 
 function createFriend(now: Date, roll: number): FriendState {
@@ -268,6 +323,29 @@ function createRollReader(rolls: number[] = []): () => number {
   };
 }
 
+function pickWeightedEncounter<T>(
+  items: Array<{ item: T; weight: number }>,
+  roll: number,
+): T | null {
+  const totalWeight = items.reduce((sum, entry) => sum + entry.weight, 0);
+
+  if (totalWeight <= 0) {
+    return null;
+  }
+
+  let cursor = roll * totalWeight;
+
+  for (const entry of items) {
+    cursor -= entry.weight;
+
+    if (cursor <= 0) {
+      return entry.item;
+    }
+  }
+
+  return items[items.length - 1]?.item ?? null;
+}
+
 function createSeededUnit(seed: string): number {
   let hash = 0;
 
@@ -339,26 +417,57 @@ export function completeWalk(
   const spouseRoll = takeRoll();
   const petRoll = takeRoll();
   const encounterRoll = takeRoll();
+  const encounterTypeRoll = takeRoll();
+
+  const canMeetFriend =
+    gameState.social.friends.length + countPendingEncounters(gameState.social.pendingEncounters, "friend") <
+    maxFriends;
+  const canMeetSpouse =
+    gameState.social.spouse === null &&
+    countPendingEncounters(gameState.social.pendingEncounters, "spouse") === 0;
+  const livingPetCount = gameState.social.pets.filter((pet) => pet.isAlive).length;
+  const pendingPetCount = countPendingEncounters(gameState.social.pendingEncounters, "pet");
+  const canMeetPet =
+    livingPetCount + pendingPetCount < maxPets;
+
+  const selectedEncounterKind =
+    encounterRoll < walkSocialEncounterChance
+      ? pickWeightedEncounter(
+          [
+            canMeetFriend
+              ? {
+                  item: "friend" as const,
+                  weight: friendEncounterWeight,
+                }
+              : null,
+            canMeetSpouse
+              ? {
+                  item: "spouse" as const,
+                  weight: spouseEncounterWeight,
+                }
+              : null,
+            canMeetPet
+              ? {
+                  item: "pet" as const,
+                  weight:
+                    livingPetCount === 0 && pendingPetCount === 0
+                      ? firstPetEncounterWeight
+                      : petEncounterWeight,
+                }
+              : null,
+          ].filter((entry): entry is { item: "friend" | "spouse" | "pet"; weight: number } => Boolean(entry)),
+          encounterTypeRoll,
+        )
+      : null;
 
   const nextFriend =
-    gameState.social.friends.length + countPendingEncounters(gameState.social.pendingEncounters, "friend") <
-      maxFriends && friendRoll < 0.32
-      ? createFriendEncounter(now, friendRoll)
-      : null;
+    selectedEncounterKind === "friend" ? createFriendEncounter(now, friendRoll) : null;
 
   const nextSpouse =
-    gameState.social.spouse === null &&
-    countPendingEncounters(gameState.social.pendingEncounters, "spouse") === 0 &&
-    spouseRoll < 0.15
-      ? createSpouseEncounter(now, spouseRoll)
-      : null;
+    selectedEncounterKind === "spouse" ? createSpouseEncounter(now, spouseRoll) : null;
 
   const nextPet =
-    gameState.social.pets.filter((pet) => pet.isAlive).length +
-      countPendingEncounters(gameState.social.pendingEncounters, "pet") <
-      maxPets && petRoll < 0.22
-      ? createPetEncounter(now, petRoll)
-      : null;
+    selectedEncounterKind === "pet" ? createPetEncounter(now, petRoll) : null;
 
   const { pets: resolvedPets, deceasedPet } = resolvePetStatus(gameState.social.pets, now, takeRoll);
   const encounterCandidates = [
@@ -387,15 +496,16 @@ export function completeWalk(
   const selectedEncounter =
     deceasedPet || encounterCandidates.length === 0
       ? null
-      : pickByRoll(encounterCandidates, encounterRoll);
+      : encounterCandidates[0] ?? null;
   const selectedWalkOutcome =
     deceasedPet || selectedEncounter ? null : pickByRoll(walkOutcomes, takeRoll());
-
-  const nextMoney = clamp(
+  const moneyAfterWalkOutcome = clamp(
     gameState.player.money + (selectedWalkOutcome?.moneyDelta ?? 0),
     0,
     1_000_000,
   );
+  const walkMoneyIncident = createWalkMoneyIncident(moneyAfterWalkOutcome, takeRoll);
+  const nextMoney = clamp(moneyAfterWalkOutcome + (walkMoneyIncident?.moneyDelta ?? 0), 0, 1_000_000);
   const nextHealth = clamp(
     gameState.player.health + (selectedWalkOutcome?.healthDelta ?? 0),
     0,
@@ -410,7 +520,7 @@ export function completeWalk(
     100,
   );
 
-  const nextState = normalizeGameState({
+  const baseNextState = normalizeGameState({
     ...gameState,
     player: {
       ...gameState.player,
@@ -433,43 +543,56 @@ export function completeWalk(
       walk: null,
     },
   });
+  const shouldDiscoverOrder = takeRoll() < 0.35;
+  const orderDiscovery = shouldDiscoverOrder
+    ? discoverOrderFromWalk(baseNextState)
+    : { game: baseNextState, order: null };
+  const nextState = orderDiscovery.game;
 
-  const logs: SocialLogDraft[] = deceasedPet
-    ? [
-        {
-          kind: "pet_died",
-          message: `${deceasedPet.species} ${deceasedPet.name} прожил свою яркую жизнь и ушел на радугу.`,
-        },
-      ]
+  const primaryLog: SocialLogDraft | null = deceasedPet
+    ? {
+        kind: "pet_died",
+        message: `${deceasedPet.species} ${deceasedPet.name} прожил свою яркую жизнь и ушел на радугу.`,
+      }
     : selectedEncounter?.kind === "friend"
-      ? [
-          {
-            kind: "friend_found",
-            message: `На прогулке появился новый знакомый: ${selectedEncounter.encounter.friend.name}. Знакомство ждет подтверждения.`,
-          },
-        ]
+      ? {
+          kind: "friend_found",
+          message: `На прогулке появился новый знакомый: ${selectedEncounter.encounter.friend.name}. Знакомство ждет подтверждения.`,
+        }
       : selectedEncounter?.kind === "spouse"
-        ? [
-            {
-              kind: "spouse_found",
-              message: `Герой познакомился с ${selectedEncounter.encounter.spouse.name}. Реши, продолжать ли эту социальную историю.`,
-            },
-          ]
+        ? {
+            kind: "spouse_found",
+            message: `Герой познакомился с ${selectedEncounter.encounter.spouse.name}. Реши, продолжать ли эту социальную историю.`,
+          }
         : selectedEncounter?.kind === "pet"
-          ? [
-              {
-                kind: "pet_found",
-                message: `Домой напрашивается ${selectedEncounter.encounter.pet.species} по имени ${selectedEncounter.encounter.pet.name}. Нужно принять решение.`,
-              },
-            ]
+          ? {
+              kind: "pet_found",
+              message: `Домой напрашивается ${selectedEncounter.encounter.pet.species} по имени ${selectedEncounter.encounter.pet.name}. Нужно принять решение.`,
+            }
           : selectedWalkOutcome
-            ? [
-                {
-                  kind: "walk_completed",
-                  message: `${selectedWalkOutcome.title}: ${selectedWalkOutcome.message}`,
-                },
-              ]
-            : [];
+            ? {
+                kind: "walk_completed",
+                message: `${selectedWalkOutcome.title}: ${selectedWalkOutcome.message}`,
+              }
+            : null;
+  const extraMessages = [
+    orderDiscovery.order
+      ? `На прогулке подвернулся заказ: ${orderDiscovery.order.title}. Он добавлен в список доступных.`
+      : null,
+    walkMoneyIncident?.message ?? null,
+  ].filter((message): message is string => Boolean(message));
+  const logs =
+    primaryLog === null
+      ? []
+      : [
+          {
+            ...primaryLog,
+            message:
+              extraMessages.length > 0
+                ? `${primaryLog.message} ${extraMessages.join(" ")}`
+                : primaryLog.message,
+          },
+        ];
 
   return {
     game: nextState,

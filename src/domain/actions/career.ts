@@ -1,18 +1,22 @@
 import { createActivityTimer } from "../factories";
 import { convertGameDaysToMinutes } from "../rules";
 import { normalizeGameState } from "../utils";
-import type { CareerHistoryEntry, Company, GameState, Vacancy, VacancyTemplate } from "../types";
+import type {
+  CareerHistoryEntry,
+  Company,
+  GameState,
+  SkillTrackId,
+  Vacancy,
+  VacancyTemplate,
+} from "../types";
 
 const minimumJobSearchDays = 1;
 const maximumJobSearchDays = 3;
-const minimumVacancyCount = 1;
-const maximumVacancyCount = 3;
-
 function buildVacancyId(index: number, at: Date): string {
   return `vacancy-${at.getTime()}-${index + 1}`;
 }
 
-function getActiveTrackKeys(gameState: GameState): string[] {
+function getActiveTrackKeys(gameState: GameState): SkillTrackId[] {
   return Object.values(gameState.skills.tracks)
     .filter((track) => track.points > 0 || track.track === "qa")
     .map((track) => track.track);
@@ -46,39 +50,6 @@ function meetsVacancyRequirements(gameState: GameState, template: VacancyTemplat
     progress.points < template.requirements.requiredQualificationPoints
   ) {
     return false;
-  }
-
-  if (template.requirements.requiredPreviousTrack?.length) {
-    const historyTracks = new Set(
-      gameState.career.previousJobHistory.map((entry) => entry.track).concat(
-        gameState.career.currentTrack ? [gameState.career.currentTrack] : [],
-      ),
-    );
-
-    const hasMatchingTrack = template.requirements.requiredPreviousTrack.some((track) =>
-      historyTracks.has(track),
-    );
-
-    if (!hasMatchingTrack) {
-      return false;
-    }
-  }
-
-  if (template.requirements.requiredPreviousTitle?.length) {
-    const currentTitle = getCurrentTitle(gameState);
-    const historyTitles = new Set(
-      gameState.career.previousJobHistory.map((entry) => entry.title).concat(
-        currentTitle ? [currentTitle] : [],
-      ),
-    );
-
-    const hasMatchingTitle = template.requirements.requiredPreviousTitle.some((title) =>
-      historyTitles.has(title),
-    );
-
-    if (!hasMatchingTitle) {
-      return false;
-    }
   }
 
   return true;
@@ -166,38 +137,70 @@ export function completeJobSearch(
   vacancyTemplates: VacancyTemplate[],
   now: Date = new Date(),
 ): GameState {
-  const activeTracks = new Set(getActiveTrackKeys(gameState));
-  const eligibleTemplates = vacancyTemplates.filter(
-    (template) =>
-      activeTracks.has(template.track) &&
-      meetsVacancyRequirements(gameState, template),
-  );
+  const activeTracks = getActiveTrackKeys(gameState);
+  const bestTemplatesByTrack = activeTracks
+    .map((track) => {
+      const eligibleTemplates = vacancyTemplates
+        .filter((template) => template.track === track && meetsVacancyRequirements(gameState, template))
+        .sort((left, right) => {
+          if (left.requirements.requiredQualificationLevel !== right.requirements.requiredQualificationLevel) {
+            return (
+              right.requirements.requiredQualificationLevel -
+              left.requirements.requiredQualificationLevel
+            );
+          }
 
-  const orderedTemplates = eligibleTemplates.sort((left, right) =>
-    `${left.track}-${left.formalTitle}-${left.funnyTitle}`.localeCompare(
-      `${right.track}-${right.formalTitle}-${right.funnyTitle}`,
-    ),
-  );
+          if (
+            (left.requirements.requiredQualificationPoints ?? 0) !==
+            (right.requirements.requiredQualificationPoints ?? 0)
+          ) {
+            return (
+              (right.requirements.requiredQualificationPoints ?? 0) -
+              (left.requirements.requiredQualificationPoints ?? 0)
+            );
+          }
+
+          if (left.careerLevel !== right.careerLevel) {
+            return right.careerLevel - left.careerLevel;
+          }
+
+          if (left.baseSalary !== right.baseSalary) {
+            return right.baseSalary - left.baseSalary;
+          }
+
+          if (left.isGolden !== right.isGolden) {
+            return left.isGolden ? -1 : 1;
+          }
+
+          return left.formalTitle.localeCompare(right.formalTitle);
+        });
+
+      return eligibleTemplates[0] ?? null;
+    })
+    .filter((template): template is VacancyTemplate => Boolean(template))
+    .sort((left, right) => {
+      const leftProgress = gameState.skills.tracks[left.track as SkillTrackId];
+      const rightProgress = gameState.skills.tracks[right.track as SkillTrackId];
+
+      if (leftProgress.level !== rightProgress.level) {
+        return rightProgress.level - leftProgress.level;
+      }
+
+      if (leftProgress.points !== rightProgress.points) {
+        return rightProgress.points - leftProgress.points;
+      }
+
+      return left.track.localeCompare(right.track);
+    });
 
   const companyPool = [...gameState.world.companies].sort((left, right) =>
     left.id.localeCompare(right.id),
   );
-
-  const count = Math.min(
-    maximumVacancyCount,
-    Math.max(minimumVacancyCount, orderedTemplates.length),
-  );
-
-  const offset = orderedTemplates.length
-    ? Math.floor(now.getTime() / 60_000) % orderedTemplates.length
+  const offset = bestTemplatesByTrack.length
+    ? Math.floor(now.getTime() / 60_000) % companyPool.length
     : 0;
 
-  const rotatedTemplates = orderedTemplates
-    .slice(offset)
-    .concat(orderedTemplates.slice(0, offset))
-    .slice(0, count);
-
-  const vacancies = rotatedTemplates.map((template, index) =>
+  const vacancies = bestTemplatesByTrack.map((template, index) =>
     buildVacancy(
       template,
       companyPool[(offset + index) % companyPool.length],

@@ -4,7 +4,6 @@ import { AppLayout } from "./shell/app-layout";
 import { CareerPage } from "./views/career-page";
 import { HeroPage } from "./views/hero-page";
 import { LearningPage } from "./views/learning-page";
-import { LifePage } from "./views/life-page";
 import { PcOrdersPage } from "./views/pc-orders-page";
 import { ShopPage } from "./views/shop-page";
 import { SocialPage } from "./views/social-page";
@@ -44,7 +43,7 @@ export const appRouter = createBrowserRouter([
       },
       {
         path: "life",
-        element: <LifePage />,
+        element: <Navigate to="/hero" replace />,
       },
     ],
   },

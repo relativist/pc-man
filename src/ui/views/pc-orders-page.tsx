@@ -1,11 +1,12 @@
 import {
+  getNextPcTier,
   getOrderLevelByPcScore,
+  hasFriendOrderMarketAccess,
   meetsOrderPcRequirements,
   meetsOrderQualificationRequirements,
   pcScoreRangesByOrderLevel,
-  pcSlotCatalogSpec,
-  requiredPcSlots,
   type GameState,
+  type PcSpecs,
   type QualificationLevel,
 } from "../../domain";
 import { getActivityProgress, useNow } from "../activity-progress";
@@ -13,13 +14,26 @@ import { formatUiPercent } from "../display-format";
 import { InfoHint } from "../info-hint";
 import { useGameStore } from "../store-hooks";
 
-function formatSlotName(slot: keyof typeof pcSlotCatalogSpec): string {
-  return pcSlotCatalogSpec[slot].displayName;
-}
+const pcSpecLabels: Record<keyof PcSpecs, string> = {
+  cpu: "CPU",
+  gpu: "GPU",
+  ram: "RAM",
+  storage: "Storage",
+  motherboard: "Motherboard",
+  psu: "PSU",
+  cooling: "Cooling",
+  case: "Case",
+  monitor: "Monitor",
+  peripherals: "Периферия",
+};
 
 function getOrderAvailabilityHint(game: GameState): string {
+  if (!hasFriendOrderMarketAccess(game) && game.orders.discoveredOrderIds.length === 0) {
+    return "Рынок заказов откроется после первого друга. Прогулка тоже может принести отдельный заказ.";
+  }
+
   if (!game.pc.isWorkingPcReady) {
-    return "Заказы откроются после полной сборки рабочего ПК.";
+    return "Заказы откроются после покупки первого ПК.";
   }
 
   const unresolvedOrders = game.world.orderPool.filter(
@@ -47,7 +61,24 @@ function getOrderAvailabilityHint(game: GameState): string {
     return `Следующий заказ откроется от PC score ${nextPcBlockedOrder.requirements.minPcScore}.`;
   }
 
+  if (game.orders.discoveredOrderIds.length > 0) {
+    return "В списке есть заказы, найденные на прогулках. Друзья продолжают открывать основной рынок.";
+  }
+
   return "Пул заказов можно обновлять вручную, чтобы попытаться получить новые варианты.";
+}
+
+function renderPcSpecs(specs: PcSpecs) {
+  return (
+    <div className="pc-spec-list">
+      {Object.entries(specs).map(([key, value]) => (
+        <div key={key} className="stat-item">
+          <strong>{pcSpecLabels[key as keyof PcSpecs]}</strong>
+          <span>{value}</span>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export function PcOrdersPage() {
@@ -55,24 +86,8 @@ export function PcOrdersPage() {
   const actions = useGameStore((state) => state.actions);
   const now = useNow();
 
-  const nextPartsBySlot = requiredPcSlots.map((slot) => {
-    const installedLevel = game.pc.components[slot]?.level ?? 0;
-    const nextPart = game.world.availablePcParts.find(
-      (part) => part.slot === slot && part.level === installedLevel + 1,
-    );
-
-    return {
-      slot,
-      installed: game.pc.components[slot],
-      installedPart: game.pc.components[slot]
-        ? game.world.availablePcParts.find(
-            (part) => part.id === game.pc.components[slot]?.itemId,
-          ) ?? null
-        : null,
-      nextPart,
-    };
-  });
-
+  const currentBuild = game.pc.currentBuild;
+  const nextBuild = getNextPcTier(game);
   const visibleOrders = game.orders.availableOrderIds
     .map((id) => game.world.orderPool.find((order) => order.id === id))
     .filter((order): order is NonNullable<typeof order> => Boolean(order));
@@ -83,7 +98,6 @@ export function PcOrdersPage() {
     game.timers.activeOrder && activeOrder
       ? getActivityProgress(game.timers.activeOrder, now)
       : null;
-  const activeOrderLabel = activeOrder ? activeOrder.title : "Нет";
   const currentOrderTier = getOrderLevelByPcScore(game.pc.ratingScore);
   const nextOrderTier: QualificationLevel | null =
     currentOrderTier === null
@@ -92,11 +106,15 @@ export function PcOrdersPage() {
         ? (currentOrderTier + 1) as QualificationLevel
         : null;
   const nextOrderScore = nextOrderTier ? pcScoreRangesByOrderLevel[nextOrderTier].minScore : null;
-  const pcLevelHint =
-    game.pc.level > 0
-      ? `PC level считается по самому слабому компоненту. Чтобы поднять его до ${game.pc.level + 1}, все комплектующие должны быть минимум ${game.pc.level + 1} уровня.`
-      : "PC level появится после сборки полного рабочего ПК.";
+  const pcLevelHint = currentBuild
+    ? "Каждый апгрейд меняет весь ПК сразу. PC level теперь равен уровню текущей сборки."
+    : "Первый апгрейд сразу покупает полный рабочий ПК.";
   const orderAvailabilityHint = getOrderAvailabilityHint(game);
+  const friendMarketStatus = hasFriendOrderMarketAccess(game)
+    ? "Рынок друзей открыт"
+    : game.orders.discoveredOrderIds.length > 0
+      ? "Только заказы с прогулок"
+      : "Нужен первый друг";
 
   return (
     <section className="page-grid pc-grid">
@@ -109,6 +127,7 @@ export function PcOrdersPage() {
               <p>pc-man@workspace</p>
               <p>pc_level: {game.pc.level}</p>
               <p>rating_score: {game.pc.ratingScore}</p>
+              <p>build: {currentBuild?.title ?? "none"}</p>
               <p>working_pc_ready: {String(game.pc.isWorkingPcReady)}</p>
               <p>active_order: {game.orders.activeOrderId ?? "none"}</p>
               <p>order_progress: {activeOrderProgress?.percent ?? 0}%</p>
@@ -124,16 +143,16 @@ export function PcOrdersPage() {
             <strong>{game.pc.level}</strong>
           </div>
           <div>
-            <span className="metric-label">Рейтинг ПК</span>
+            <span className="metric-label">PC score</span>
             <strong>{game.pc.ratingScore}</strong>
           </div>
           <div>
-            <span className="metric-label">Статус</span>
-            <strong>{game.pc.isWorkingPcReady ? "Готов к работе" : "Нужна сборка"}</strong>
+            <span className="metric-label">Сборка</span>
+            <strong>{currentBuild?.title ?? "ПК не куплен"}</strong>
           </div>
           <div>
-            <span className="metric-label">Активный заказ</span>
-            <strong>{activeOrderLabel}</strong>
+            <span className="metric-label">Рынок заказов</span>
+            <strong>{friendMarketStatus}</strong>
           </div>
         </div>
       </div>
@@ -171,6 +190,10 @@ export function PcOrdersPage() {
               <span>Следующий порог</span>
               <strong>{nextOrderScore ? `${nextOrderScore} PC score` : "Максимум"}</strong>
             </div>
+            <div className="stat-item">
+              <span>Активный заказ</span>
+              <strong>{activeOrder ? activeOrder.title : "Нет"}</strong>
+            </div>
           </div>
           <p className="muted">{pcLevelHint}</p>
           <p className="muted">{orderAvailabilityHint}</p>
@@ -192,26 +215,26 @@ export function PcOrdersPage() {
                 </div>
                 <h4>{order.title}</h4>
                 <p>{order.funnyTitle}</p>
-                <div className="stat-list compact-stats">
+                <div className="pc-spec-list">
                   <div className="stat-item">
-                    <span>Время</span>
-                    <strong>{order.durationDays} дн.</strong>
+                    <strong>Время</strong>
+                    <span>{order.durationDays} дн.</span>
                   </div>
                   <div className="stat-item">
-                    <span>Награда</span>
-                    <strong>${order.rewardMoney}</strong>
+                    <strong>Награда</strong>
+                    <span>${order.rewardMoney}</span>
                   </div>
                   <div className="stat-item">
-                    <span>QP</span>
-                    <strong>+{order.rewardQualificationPoints}</strong>
+                    <strong>QP</strong>
+                    <span>+{order.rewardQualificationPoints}</span>
                   </div>
                   <div className="stat-item">
-                    <span>Риск</span>
-                    <strong>{formatUiPercent(order.failureChancePct)}</strong>
+                    <strong>Риск</strong>
+                    <span>{formatUiPercent(order.failureChancePct)}</span>
                   </div>
                   <div className="stat-item">
-                    <span>Мин. ПК</span>
-                    <strong>{order.requirements.minPcScore}</strong>
+                    <strong>Мин. ПК</strong>
+                    <span>{order.requirements.minPcScore}</span>
                   </div>
                 </div>
                 <button
@@ -231,89 +254,49 @@ export function PcOrdersPage() {
         <div className="section-head">
           <div>
             <div className="title-with-help">
-              <h3>Сборка и апгрейды</h3>
-              <InfoHint text="Покупка сразу ставит компонент в слот." />
+              <h3>Текущий ПК</h3>
+              <InfoHint text="Теперь ПК покупается целиком. Один апгрейд меняет всю сборку сразу." />
             </div>
           </div>
+          <span className="badge">{currentBuild ? `tier ${currentBuild.level}` : "нет ПК"}</span>
         </div>
 
-        <div className="shop-list upgrade-grid">
-          {nextPartsBySlot.map(({ slot, installed, installedPart, nextPart }) => (
-            <article key={slot} className="shop-card compact-card upgrade-card">
-              <div>
-                <p className="eyebrow">{formatSlotName(slot)}</p>
-                <h4>{installedPart?.funnyTitle ?? "Слот пуст"}</h4>
-                <p className="muted">LVL: {installed?.level ?? 0}</p>
-              </div>
-
-              {nextPart ? (
-                <>
-                  <p className="muted compact-copy">{nextPart.funnyTitle}</p>
-                  <div className="shop-actions compact-actions">
-                    <span className="badge">${nextPart.price}</span>
-                    <button
-                      className="primary-button"
-                      onClick={() => actions.buyAndInstallPcPart(nextPart.id)}
-                      disabled={game.player.money < nextPart.price}
-                    >
-                      Купить
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <p className="muted">Для этого слота достигнут потолок каталога.</p>
-              )}
-            </article>
-          ))}
-        </div>
-      </div>
-
-      <div className="panel">
-        <div className="section-head">
-          <div>
-            <div className="title-with-help">
-              <h3>Активный заказ</h3>
-              <InfoHint text="Активный заказ идет по таймеру и завершится автоматически." />
-            </div>
-          </div>
-        </div>
-
-        {activeOrder && activeOrderProgress ? (
+        {nextBuild ? (
           <div className="risk-list">
-            <article className="active-order-banner">
-              <strong>В работе: {activeOrder.title}</strong>
-              <span>{activeOrder.funnyTitle}</span>
-            </article>
             <article className="timer-card compact-card">
-              <div className="stat-list compact-stats">
-                <div className="stat-item">
-                  <span>Награда</span>
-                  <strong>${activeOrder.rewardMoney}</strong>
-                </div>
-                <div className="stat-item">
-                  <span>QP</span>
-                  <strong>+{activeOrder.rewardQualificationPoints}</strong>
-                </div>
-                <div className="stat-item">
-                  <span>Риск провала</span>
-                  <strong>{formatUiPercent(activeOrder.failureChancePct)}</strong>
-                </div>
-              </div>
-              <div className="progress-bar">
-                <div
-                  className="progress-fill progress-mid"
-                  style={{ width: `${activeOrderProgress.percent}%` }}
-                />
-              </div>
-              <p>Прогресс: {formatUiPercent(activeOrderProgress.percent)}</p>
+              <strong>{currentBuild ? currentBuild.title : "ПК ещё не куплен"}</strong>
+              <p>{currentBuild ? currentBuild.funnyTitle : "Первый апгрейд соберёт базовую рабочую машину целиком."}</p>
               <p className="muted">
-                Осталось примерно {activeOrderProgress.remainingLabel}. Заказ завершится
-                автоматически.
+                {currentBuild
+                  ? `PC score: ${currentBuild.score}. Следующий апгрейд поднимет его до ${nextBuild.score}.`
+                  : `Первый апгрейд сразу даст PC score ${nextBuild.score}.`}
               </p>
             </article>
+            {currentBuild ? renderPcSpecs(currentBuild.specs) : null}
+            <button
+              className="primary-button"
+              onClick={() => actions.buyNextPcTier()}
+              disabled={game.player.money < nextBuild.price}
+            >
+              Купить апгрейд за ${nextBuild.price}
+            </button>
           </div>
         ) : (
-          <p className="muted">Сейчас нет активного разового заказа.</p>
+          currentBuild ? (
+            <div className="risk-list">
+              <article className="timer-card compact-card">
+                <strong>{currentBuild.title}</strong>
+                <p>{currentBuild.funnyTitle}</p>
+                <p className="muted">PC score: {currentBuild.score}. Это максимальная сборка.</p>
+              </article>
+              {renderPcSpecs(currentBuild.specs)}
+            </div>
+          ) : (
+            <div className="empty-state">
+              <h4>ПК ещё не куплен</h4>
+              <p>Первый апгрейд соберёт базовую рабочую машину целиком.</p>
+            </div>
+          )
         )}
       </div>
     </section>

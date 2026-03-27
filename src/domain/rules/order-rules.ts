@@ -20,6 +20,10 @@ export function isOrderAlreadyResolved(gameState: GameState, orderId: string): b
   );
 }
 
+export function hasFriendOrderMarketAccess(gameState: GameState): boolean {
+  return gameState.social.friends.length > 0;
+}
+
 export function meetsOrderQualificationRequirements(
   gameState: GameState,
   order: Order,
@@ -93,22 +97,49 @@ export function getEligibleOrders(gameState: GameState): Order[] {
   return gameState.world.orderPool.filter((order) => canOrderBeTaken(gameState, order));
 }
 
-export function selectVisibleOrders(gameState: GameState, now: Date): Order[] {
-  const eligibleOrders = gameState.world.orderPool
-    .filter((order) => isOrderVisibleToPlayer(gameState, order))
-    .sort((left, right) => left.id.localeCompare(right.id));
-
-  if (eligibleOrders.length <= maxVisibleOrders) {
-    return eligibleOrders;
+function compareEligibleOrders(left: Order, right: Order): number {
+  if (left.level !== right.level) {
+    return right.level - left.level;
   }
 
-  const bucket = Math.floor(now.getTime() / (orderRefreshIntervalMinutes * 60_000));
-  const offset = bucket % eligibleOrders.length;
-  const rotated = eligibleOrders
-    .slice(offset)
-    .concat(eligibleOrders.slice(0, offset));
+  if (left.requirements.minQualificationLevel !== right.requirements.minQualificationLevel) {
+    return right.requirements.minQualificationLevel - left.requirements.minQualificationLevel;
+  }
 
-  return rotated.slice(0, maxVisibleOrders);
+  if (left.requirements.minPcScore !== right.requirements.minPcScore) {
+    return right.requirements.minPcScore - left.requirements.minPcScore;
+  }
+
+  if (left.rewardMoney !== right.rewardMoney) {
+    return right.rewardMoney - left.rewardMoney;
+  }
+
+  if (left.rewardQualificationPoints !== right.rewardQualificationPoints) {
+    return right.rewardQualificationPoints - left.rewardQualificationPoints;
+  }
+
+  return left.id.localeCompare(right.id);
+}
+
+export function getBestEligibleOrders(gameState: GameState): Order[] {
+  return gameState.world.orderPool
+    .filter((order) => isOrderVisibleToPlayer(gameState, order))
+    .sort(compareEligibleOrders);
+}
+
+export function selectVisibleOrders(gameState: GameState, now: Date): Order[] {
+  const eligibleOrders = getBestEligibleOrders(gameState);
+  const discoveredIds = new Set(gameState.orders.discoveredOrderIds);
+  const discoveredOrders = eligibleOrders.filter((order) => discoveredIds.has(order.id));
+
+  if (!hasFriendOrderMarketAccess(gameState)) {
+    return discoveredOrders.slice(0, maxVisibleOrders);
+  }
+
+  const marketOrders = eligibleOrders.filter((order) => !discoveredIds.has(order.id));
+  const combinedOrders = [...discoveredOrders, ...marketOrders];
+
+  return combinedOrders.slice(0, maxVisibleOrders);
 }
 
 export function shouldRefreshOrders(gameState: GameState, now: Date): boolean {

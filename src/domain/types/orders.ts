@@ -30,10 +30,11 @@ export type OrderTemplate = Omit<Order, "id">;
 
 export type OrderState = {
   activeOrderId: string | null;
+  activeOrderSource: "friend" | "walk" | null;
   availableOrderIds: string[];
+  discoveredOrderIds: string[];
   completedOrderIds: string[];
   failedOrderIds: string[];
   lastRefreshAt: IsoDateString | null;
   nextRefreshAt: IsoDateString | null;
 };
-

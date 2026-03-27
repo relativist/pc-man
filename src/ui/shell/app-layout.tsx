@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 
-import type { PendingSocialEncounter } from "../../domain";
+import type { GameState, PendingSocialEncounter } from "../../domain";
 import { formatUiAgeYears } from "../display-format";
 import { useGameStore } from "../store-hooks";
 
@@ -12,7 +12,6 @@ const navItems = [
   { to: "/career", label: "Карьера" },
   { to: "/learning", label: "Обучение" },
   { to: "/social", label: "Хобби и Соцжизнь" },
-  { to: "/life", label: "Быт и Здоровье" },
 ];
 
 const trackTitles: Record<string, string> = {
@@ -23,6 +22,8 @@ const trackTitles: Record<string, string> = {
   pentester: "Pentester",
   analyst: "Analyst",
 };
+
+const passiveLifeSettleIntervalMs = 10_000;
 
 function getEncounterName(encounter: PendingSocialEncounter): string {
   if (encounter.kind === "friend") {
@@ -53,6 +54,10 @@ function getGameOverReasonLabel(reason: string | null): string {
     return "Голод";
   }
 
+  if (reason === "obesity") {
+    return "Ожирение";
+  }
+
   if (reason === "illness") {
     return "Критическое здоровье";
   }
@@ -64,10 +69,87 @@ function getGameOverReasonLabel(reason: string | null): string {
   return "Неизвестная причина";
 }
 
+type DeathRiskWarning = {
+  key: string;
+  eyebrow: string;
+  title: string;
+  message: string;
+  advice: string;
+};
+
+function getDeathRiskWarning(game: GameState): DeathRiskWarning | null {
+  if (game.meta.isGameOver || !game.player.isAlive) {
+    return null;
+  }
+
+  if (game.player.hunger >= 90) {
+    return {
+      key: "hunger-critical",
+      eyebrow: "Риск смерти",
+      title: "Критический голод",
+      message: `Голод достиг ${game.player.hunger}%. Герой близок к смерти от истощения.`,
+      advice: "Срочно покорми героя. Иначе следующий прогон времени может закончиться смертью от голода.",
+    };
+  }
+
+  if (game.player.health <= 25) {
+    return {
+      key: "health-critical",
+      eyebrow: "Риск смерти",
+      title: "Критическое здоровье",
+      message: `Здоровье упало до ${game.player.health}%. Организм уже на грани отказа.`,
+      advice: "Нужно быстро поднять здоровье: лечение в приоритете, дальше еда и восстановление формы.",
+    };
+  }
+
+  if (game.player.weight >= 95) {
+    return {
+      key: game.player.weight >= 100 ? "weight-critical" : "weight-danger",
+      eyebrow: "Риск смерти",
+      title: "Опасный вес",
+      message: `Вес героя ${game.player.weight.toFixed(1)} кг. До смертельного ожирения осталось совсем немного.`,
+      advice: "Останови набор веса: меньше еды без необходимости, больше тренировок и контроль здоровья.",
+    };
+  }
+
+  if (game.player.ageYears >= 85) {
+    return {
+      key: "age-critical",
+      eyebrow: "Риск смерти",
+      title: "Критический возраст",
+      message: `Герою уже ${formatUiAgeYears(game.player.ageYears)}. Любое проседание здоровья теперь особенно опасно.`,
+      advice: "Держи здоровье высоким и не откладывай дорогое лечение, чтобы не поймать смерть от старости.",
+    };
+  }
+
+  if (game.player.hunger >= 70) {
+    return {
+      key: "hunger-danger",
+      eyebrow: "Предупреждение",
+      title: "Сильный голод",
+      message: `Голод уже ${game.player.hunger}%. Если запустить это состояние, герой умрет от голода.`,
+      advice: "Поесть сейчас дешевле, чем потом разгребать критическое здоровье.",
+    };
+  }
+
+  if (game.player.health <= 45) {
+    return {
+      key: "health-danger",
+      eyebrow: "Предупреждение",
+      title: "Здоровье проседает",
+      message: `Здоровье упало до ${game.player.health}%. Следующий виток ухудшения может стать критическим.`,
+      advice: "Подними здоровье заранее: лечение, еда и нормальный ритм жизни сейчас важнее прокачки.",
+    };
+  }
+
+  return null;
+}
+
 export function AppLayout() {
   const game = useGameStore((state) => state.game);
   const actions = useGameStore((state) => state.actions);
   const [isNotificationDrawerOpen, setNotificationDrawerOpen] = useState(false);
+  const [dismissedDeathRiskKey, setDismissedDeathRiskKey] = useState<string | null>(null);
   const previousUnreadCountRef = useRef(0);
   const notificationAutoOpenedRef = useRef(false);
 
@@ -77,6 +159,9 @@ export function AppLayout() {
   const unreadLogs = logs.filter((entry) => new Date(entry.at).getTime() > lastViewedLogAtMs);
   const unreadCount = unreadLogs.length;
   const latestLogAt = logs[0]?.at ?? null;
+  const deathRiskWarning = getDeathRiskWarning(game);
+  const isDeathRiskModalOpen =
+    Boolean(deathRiskWarning) && deathRiskWarning?.key !== dismissedDeathRiskKey;
 
   useEffect(() => {
     actions.settleToNow();
@@ -103,6 +188,14 @@ export function AppLayout() {
 
     return () => window.clearTimeout(timeoutId);
   }, [actions, timers]);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      actions.settleToNow();
+    }, passiveLifeSettleIntervalMs);
+
+    return () => window.clearInterval(intervalId);
+  }, [actions]);
 
   useEffect(() => {
     if (unreadCount > previousUnreadCountRef.current) {
@@ -132,6 +225,12 @@ export function AppLayout() {
     }
   }, [actions, isNotificationDrawerOpen, latestLogAt, meta.lastViewedLogAt]);
 
+  useEffect(() => {
+    if (!deathRiskWarning) {
+      setDismissedDeathRiskKey(null);
+    }
+  }, [deathRiskWarning]);
+
   if (meta.isGameOver || !player.isAlive) {
     const qualificationSummary = Object.values(game.skills.tracks)
       .sort((left, right) => right.points - left.points)
@@ -140,95 +239,44 @@ export function AppLayout() {
         label: trackTitles[track.track] ?? track.track,
         value: `lvl ${track.level} / ${track.points} QP`,
       }));
+    const gameOverSummaryItems = [
+      { label: "Причина смерти", value: getGameOverReasonLabel(meta.gameOverReason) },
+      { label: "Возраст", value: formatUiAgeYears(player.ageYears) },
+      { label: "Деньги", value: `$${player.money}` },
+      { label: "Капитал", value: `$${player.capital}` },
+      { label: "Прочитано книг", value: String(game.learning.completedBookIds.length) },
+      { label: "Выполнено заказов", value: String(game.orders.completedOrderIds.length) },
+      { label: "Провалено заказов", value: String(game.orders.failedOrderIds.length) },
+      { label: "Работа", value: career.currentJobId ? "Была активна" : "Не устроился" },
+      { label: "Супруга", value: social.spouse ? social.spouse.name : "Нет" },
+      { label: "Дети", value: String(social.childrenCount) },
+      { label: "Друзья", value: String(social.friends.length) },
+      { label: "Питомцы", value: String(social.pets.filter((pet) => pet.isAlive).length) },
+      ...(
+        qualificationSummary.length > 0
+          ? qualificationSummary.map((item) => ({
+              label: `Квалификация: ${item.label}`,
+              value: item.value,
+            }))
+          : [{ label: "Квалификации", value: "Нет заметного прогресса" }]
+      ),
+    ];
 
     return (
       <div className="app-shell game-over-shell">
         <section className="panel game-over-panel">
           <p className="eyebrow">Game Over</p>
           <h1>{player.name}</h1>
-          <p className="lede">
-            Игра завершена. Обычный интерфейс скрыт, пока не будет запущена новая сессия.
-          </p>
 
-          <div className="hero-metrics">
-            <div>
-              <span className="metric-label">Причина смерти</span>
-              <strong>{getGameOverReasonLabel(meta.gameOverReason)}</strong>
+          <div className="timer-card">
+            <div className="pc-spec-list">
+              {gameOverSummaryItems.map((item) => (
+                <div key={item.label} className="stat-item">
+                  <strong>{item.label}</strong>
+                  <span>{item.value}</span>
+                </div>
+              ))}
             </div>
-            <div>
-              <span className="metric-label">Возраст</span>
-              <strong>{formatUiAgeYears(player.ageYears)}</strong>
-            </div>
-            <div>
-              <span className="metric-label">Деньги</span>
-              <strong>${player.money}</strong>
-            </div>
-            <div>
-              <span className="metric-label">Капитал</span>
-              <strong>${player.capital}</strong>
-            </div>
-          </div>
-
-          <div className="game-over-grid">
-            <div className="timer-card">
-              <strong>Итоги прохождения</strong>
-              <div className="stat-list compact-stats">
-                <div className="stat-item">
-                  <span>Прочитано книг</span>
-                  <strong>{game.learning.completedBookIds.length}</strong>
-                </div>
-                <div className="stat-item">
-                  <span>Выполнено заказов</span>
-                  <strong>{game.orders.completedOrderIds.length}</strong>
-                </div>
-                <div className="stat-item">
-                  <span>Провалено заказов</span>
-                  <strong>{game.orders.failedOrderIds.length}</strong>
-                </div>
-                <div className="stat-item">
-                  <span>Работа</span>
-                  <strong>{career.currentJobId ? "Была активна" : "Не устроился"}</strong>
-                </div>
-              </div>
-            </div>
-
-            <div className="timer-card">
-              <strong>Семья и окружение</strong>
-              <div className="stat-list compact-stats">
-                <div className="stat-item">
-                  <span>Супруга</span>
-                  <strong>{social.spouse ? social.spouse.name : "Нет"}</strong>
-                </div>
-                <div className="stat-item">
-                  <span>Дети</span>
-                  <strong>{social.childrenCount}</strong>
-                </div>
-                <div className="stat-item">
-                  <span>Друзья</span>
-                  <strong>{social.friends.filter((friend) => friend.isActive).length}</strong>
-                </div>
-                <div className="stat-item">
-                  <span>Питомцы</span>
-                  <strong>{social.pets.filter((pet) => pet.isAlive).length}</strong>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="panel game-over-summary">
-            <h3>Квалификации</h3>
-            {qualificationSummary.length > 0 ? (
-              <div className="chips">
-                {qualificationSummary.map((item) => (
-                  <div key={item.label} className="chip">
-                    <span>{item.label}</span>
-                    <strong>{item.value}</strong>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="muted">Квалификации не успели вырасти до заметного результата.</p>
-            )}
           </div>
 
           <div className="game-over-actions">
@@ -339,7 +387,31 @@ export function AppLayout() {
         )}
       </aside>
 
-      {pendingEncounter ? (
+      {isDeathRiskModalOpen && deathRiskWarning ? (
+        <div className="modal-backdrop">
+          <div className="modal-card">
+            <div className="section-head">
+              <div>
+                <p className="eyebrow">{deathRiskWarning.eyebrow}</p>
+                <h3>{deathRiskWarning.title}</h3>
+              </div>
+              <span className="badge">Важно</span>
+            </div>
+
+            <p>{deathRiskWarning.message}</p>
+            <p className="muted">{deathRiskWarning.advice}</p>
+
+            <div className="modal-actions">
+              <button
+                className="primary-button"
+                onClick={() => setDismissedDeathRiskKey(deathRiskWarning.key)}
+              >
+                Понял
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : pendingEncounter ? (
         <div className="modal-backdrop">
           <div className="modal-card">
             <div className="section-head">

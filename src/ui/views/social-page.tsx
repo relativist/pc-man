@@ -14,8 +14,11 @@ export function SocialPage() {
   const actions = useGameStore((state) => state.actions);
   const now = useNow();
 
-  const activeFriends = game.social.friends.filter((friend) => friend.isActive);
-  const inactiveFriends = game.social.friends.filter((friend) => !friend.isActive);
+  const friends = game.social.friends;
+  const remainingFriendOrders = friends.reduce(
+    (total, friend) => total + (friend.maxOrdersGiven - friend.ordersGivenCount),
+    0,
+  );
   const livingPets = game.social.pets.filter((pet) => pet.isAlive);
   const departedPets = game.social.pets.filter((pet) => !pet.isAlive);
   const spouse = game.social.spouse;
@@ -34,7 +37,7 @@ export function SocialPage() {
           <div>
             <span className="metric-label">Друзья</span>
             <strong>
-              {activeFriends.length}/{maxFriends}
+              {friends.length}/{maxFriends}
             </strong>
           </div>
           <div>
@@ -58,7 +61,7 @@ export function SocialPage() {
         </div>
       </div>
 
-      <div className="panel compact-panel">
+      <div className="panel compact-panel social-summary-panel">
         <div className="section-head">
           <div>
             <div className="title-with-help">
@@ -109,50 +112,38 @@ export function SocialPage() {
         )}
       </div>
 
-      <div className="panel compact-panel">
+      <div className="panel compact-panel social-summary-panel">
         <div className="section-head">
           <div>
             <div className="title-with-help">
               <h3>Друзья</h3>
-              <InfoHint text="Чем чаще гуляешь, тем больше знакомых находишь. Каждый друг в будущем сможет дать до 3 заказов." />
+              <InfoHint text="Чем чаще гуляешь, тем больше знакомых находишь. Каждый друг дает до 3 заказов, после чего исчезает из сети контактов." />
             </div>
           </div>
-          <span className="badge">{activeFriends.length} активных</span>
+          <span className="badge">{remainingFriendOrders} заказов осталось</span>
         </div>
 
-        {activeFriends.length === 0 ? (
+        {friends.length === 0 ? (
           <div className="empty-state">
             <h4>Пока пусто</h4>
             <p>Начни прогулки, чтобы собрать сеть знакомых и открыть поток заказов от друзей.</p>
           </div>
         ) : (
-          <div className="order-list">
-            {activeFriends.map((friend) => {
-              const remainingOrders = friend.maxOrdersGiven - friend.ordersGivenCount;
-
-              return (
-                <article key={friend.id} className="order-card compact-card">
-                  <div className="order-meta">
-                    <span className="badge">Друг</span>
-                    <span className="badge">{remainingOrders} заказов осталось</span>
-                  </div>
-                  <h4>{friend.name}</h4>
-                  <p>
-                    Уже выдал: {friend.ordersGivenCount} из {friend.maxOrdersGiven}. После третьего заказа друг
-                    пропадет из активного пула.
-                  </p>
-                </article>
-              );
-            })}
+          <div className="risk-list">
+            <article className="timer-card compact-card">
+              <strong>Сеть знакомых работает</strong>
+              <p>Друзей в сети: {friends.length}.</p>
+              <p>Осталось friend-заказов: {remainingFriendOrders}.</p>
+              <p>
+                Каждый завершенный или проваленный заказ друзей сжигает один слот. После 3 слотов
+                друг исчезает из списка.
+              </p>
+            </article>
           </div>
         )}
-
-        {inactiveFriends.length > 0 ? (
-          <p className="muted">Отработавшие знакомые: {inactiveFriends.length}. Их еще можно хранить в истории героя.</p>
-        ) : null}
       </div>
 
-      <div className="panel compact-panel">
+      <div className="panel compact-panel social-summary-panel">
         <div className="section-head">
           <div>
             <div className="title-with-help">

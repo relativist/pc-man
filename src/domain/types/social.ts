@@ -63,4 +63,5 @@ export type SocialState = {
   friends: FriendState[];
   pets: PetState[];
   pendingEncounters: PendingSocialEncounter[];
+  friendOrderRotationIndex: number;
 };

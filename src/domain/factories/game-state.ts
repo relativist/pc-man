@@ -1,4 +1,4 @@
-import { books, companies, orderTemplates, pcPartsCatalog, shopCatalogs } from "../catalogs";
+import { books, companies, orderTemplates, pcTierCatalog, shopCatalogs } from "../catalogs";
 import { selectVisibleOrders } from "../rules";
 import { normalizeGameState } from "../utils";
 import type {
@@ -7,7 +7,6 @@ import type {
   CareerState,
   EventLogEntry,
   GameState,
-  PcComponentSlot,
   PlayerState,
   QualificationProgress,
   ShopState,
@@ -22,20 +21,6 @@ export type CreateNewGameOptions = {
   playerName?: string;
   saveSlotId?: string;
 };
-
-const pcSlots: PcComponentSlot[] = [
-  "cpu",
-  "motherboard",
-  "ram",
-  "gpu",
-  "ssd",
-  "power_supply",
-  "case",
-  "cooling",
-  "monitor",
-  "keyboard",
-  "mouse",
-];
 
 const firstNames = [
   "Артемий",
@@ -137,7 +122,7 @@ function createInitialPlayerState(playerName: string | undefined, seed: string):
     id: createId("player", "1"),
     name: playerName ?? generatedName,
     ageYears: 21,
-    money: 1000,
+    money: 100000,
     realEstateValue: 0,
     propertyValue: 0,
     capital: 1000,
@@ -179,22 +164,21 @@ function createInitialLearningState(availableBooks: Book[]): GameState["learning
 }
 
 function createInitialPcState(): GameState["pc"] {
-  const components = Object.fromEntries(
-    pcSlots.map((slot) => [slot, null]),
-  ) as GameState["pc"]["components"];
-
   return {
     isWorkingPcReady: false,
     level: 0,
     ratingScore: 0,
-    components,
+    currentTierId: null,
+    currentBuild: null,
   };
 }
 
 function createInitialOrdersState(now: Date, orderPool: WorldState["orderPool"]): GameState["orders"] {
   return {
     activeOrderId: null,
-    availableOrderIds: orderPool.map((order) => order.id),
+    activeOrderSource: null,
+    availableOrderIds: [],
+    discoveredOrderIds: [],
     completedOrderIds: [],
     failedOrderIds: [],
     lastRefreshAt: toIsoDate(now),
@@ -235,7 +219,7 @@ function createInitialWorldState(): WorldState {
     companies: [...companies],
     activeVacancies: [],
     availableBooks: [...books],
-    availablePcParts: [...pcPartsCatalog],
+    availablePcTiers: [...pcTierCatalog],
     orderPool: orderTemplates.map((template, index) => ({
       ...template,
       id: createId("order", String(index + 1)),
@@ -297,6 +281,7 @@ export function createInitialGameState(options: CreateNewGameOptions = {}): Game
       friends: [],
       pets: [],
       pendingEncounters: [],
+      friendOrderRotationIndex: 0,
     },
     world,
     timers: createInitialTimers(),

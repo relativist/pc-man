@@ -268,6 +268,45 @@ button {
   margin: 6px 0 0;
 }
 
+.learning-current-panel {
+  align-content: start;
+}
+
+.learning-summary-panel,
+.learning-current-panel {
+  min-height: 250px;
+}
+
+.learning-current-card {
+  min-height: 170px;
+  align-content: start;
+}
+
+.pc-spec-list {
+  display: grid;
+  gap: 8px;
+}
+
+.pc-spec-list .stat-item {
+  padding: 8px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.pc-spec-list .stat-item:last-child {
+  border-bottom: 0;
+}
+
+.pc-spec-list .stat-item strong {
+  text-align: left;
+}
+
+.pc-spec-list .stat-item span {
+  text-align: right;
+}
+
 .risk-card p,
 .timer-card p {
   margin: 8px 0 0;
@@ -351,6 +390,16 @@ button {
   display: grid;
   gap: 12px;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.vacancy-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.vacancy-card {
+  align-content: start;
 }
 
 .learning-section h4 {
@@ -499,6 +548,10 @@ button {
   grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
 }
 
+.hero-property-list {
+  grid-template-columns: 1fr;
+}
+
 .compact-book-stats .stat-item {
   padding: 10px 12px;
 }
@@ -507,12 +560,61 @@ button {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.hero-action-list {
+  grid-template-columns: 1fr;
+}
+
+.hero-action-list .order-card {
+  display: grid;
+  gap: 12px;
+}
+
+.hero-action-list .primary-button {
+  width: 100%;
+}
+
 .compact-panel {
   align-content: start;
 }
 
+.social-summary-panel {
+  min-height: 280px;
+}
+
+.hero-column-stack {
+  display: grid;
+  gap: 16px;
+}
+
+.hero-side-stack {
+  display: grid;
+  gap: 16px;
+}
+
 .compact-actions {
   flex-wrap: wrap;
+}
+
+.healing-ring {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.healing-ring-inner {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: rgba(14, 20, 23, 0.95);
+  display: grid;
+  place-items: center;
+}
+
+.healing-ring-inner strong {
+  font-size: 0.72rem;
 }
 
 .primary-button,
@@ -638,6 +740,14 @@ button {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.career-main-panel {
+  grid-column: span 2;
+}
+
+.career-side-panel {
+  grid-column: span 1;
+}
+
 .upgrade-card {
   align-content: start;
 }
@@ -652,11 +762,17 @@ button {
   .page-grid,
   .dense-grid,
   .learning-section-grid,
+  .vacancy-grid,
   .pc-grid,
   .life-action-list,
   .game-over-grid,
   .upgrade-grid {
     grid-template-columns: 1fr;
+  }
+
+  .career-main-panel,
+  .career-side-panel {
+    grid-column: auto;
   }
 
   .sidebar {

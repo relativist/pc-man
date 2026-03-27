@@ -3,15 +3,76 @@ import {
   applyQualificationPoints,
   canOrderBeTaken,
   convertGameDaysToMinutes,
+  getBestEligibleOrders,
   getOrderById,
   orderRefreshIntervalMinutes,
   selectVisibleOrders,
 } from "../rules";
 import { normalizeGameState } from "../utils";
-import type { GameState } from "../types";
+import type { FriendState, GameState, Order } from "../types";
 
 function removeOrderId(ids: string[], orderId: string): string[] {
   return ids.filter((id) => id !== orderId);
+}
+
+function isOrderCurrentlyKnown(gameState: GameState, orderId: string): boolean {
+  return (
+    gameState.orders.availableOrderIds.includes(orderId) ||
+    gameState.orders.discoveredOrderIds.includes(orderId)
+  );
+}
+
+function consumeFriendOrderSlot(gameState: GameState): GameState {
+  const friends = gameState.social.friends;
+
+  if (friends.length === 0) {
+    return gameState;
+  }
+
+  const startIndex = gameState.social.friendOrderRotationIndex % friends.length;
+  let selectedIndex = -1;
+
+  for (let offset = 0; offset < friends.length; offset += 1) {
+    const index = (startIndex + offset) % friends.length;
+    const friend = friends[index];
+
+    if (friend.isActive && friend.ordersGivenCount < friend.maxOrdersGiven) {
+      selectedIndex = index;
+      break;
+    }
+  }
+
+  if (selectedIndex === -1) {
+    return gameState;
+  }
+
+  const nextFriends = friends
+    .map((friend, index): FriendState | null => {
+      if (index !== selectedIndex) {
+        return friend;
+      }
+
+      const nextOrdersGivenCount = friend.ordersGivenCount + 1;
+
+      if (nextOrdersGivenCount >= friend.maxOrdersGiven) {
+        return null;
+      }
+
+      return {
+        ...friend,
+        ordersGivenCount: nextOrdersGivenCount,
+      };
+    })
+    .filter((friend): friend is FriendState => Boolean(friend));
+
+  return normalizeGameState({
+    ...gameState,
+    social: {
+      ...gameState.social,
+      friends: nextFriends,
+      friendOrderRotationIndex: nextFriends.length === 0 ? 0 : selectedIndex % nextFriends.length,
+    },
+  });
 }
 
 export function refreshAvailableOrders(gameState: GameState, now: Date = new Date()): GameState {
@@ -50,12 +111,16 @@ export function startOrder(
     throw new Error(`Order cannot be taken: ${orderId}`);
   }
 
+  const activeOrderSource = gameState.orders.discoveredOrderIds.includes(orderId) ? "walk" : "friend";
+
   return normalizeGameState({
     ...gameState,
     orders: {
       ...gameState.orders,
       activeOrderId: orderId,
+      activeOrderSource,
       availableOrderIds: removeOrderId(gameState.orders.availableOrderIds, orderId),
+      discoveredOrderIds: removeOrderId(gameState.orders.discoveredOrderIds, orderId),
     },
     timers: {
       ...gameState.timers,
@@ -69,11 +134,32 @@ export function startOrder(
   });
 }
 
+export function discoverOrderFromWalk(gameState: GameState): { game: GameState; order: Order | null } {
+  const nextOrder =
+    getBestEligibleOrders(gameState).find((order) => !isOrderCurrentlyKnown(gameState, order.id)) ?? null;
+
+  if (!nextOrder) {
+    return { game: gameState, order: null };
+  }
+
+  return {
+    game: normalizeGameState({
+      ...gameState,
+      orders: {
+        ...gameState.orders,
+        discoveredOrderIds: [...gameState.orders.discoveredOrderIds, nextOrder.id],
+      },
+    }),
+    order: nextOrder,
+  };
+}
+
 export function resolveActiveOrder(
   gameState: GameState,
   randomValue: number = Math.random(),
 ): GameState {
   const activeOrderId = gameState.orders.activeOrderId;
+  const activeOrderSource = gameState.orders.activeOrderSource;
 
   if (!activeOrderId) {
     throw new Error("No active order to resolve");
@@ -87,11 +173,12 @@ export function resolveActiveOrder(
   const failed = randomValue < order.failureChancePct / 100;
 
   if (failed) {
-    return normalizeGameState({
+    const failedState = normalizeGameState({
       ...gameState,
       orders: {
         ...gameState.orders,
         activeOrderId: null,
+        activeOrderSource: null,
         failedOrderIds: [...gameState.orders.failedOrderIds, activeOrderId],
       },
       timers: {
@@ -99,6 +186,8 @@ export function resolveActiveOrder(
         activeOrder: null,
       },
     });
+
+    return activeOrderSource === "friend" ? consumeFriendOrderSlot(failedState) : failedState;
   }
 
   const currentTrackProgress = gameState.skills.tracks[order.track];
@@ -110,7 +199,7 @@ export function resolveActiveOrder(
     order.rewardQualificationPoints,
   );
 
-  return normalizeGameState({
+  const completedState = normalizeGameState({
     ...gameState,
     player: {
       ...gameState.player,
@@ -126,6 +215,7 @@ export function resolveActiveOrder(
     orders: {
       ...gameState.orders,
       activeOrderId: null,
+      activeOrderSource: null,
       completedOrderIds: [...gameState.orders.completedOrderIds, activeOrderId],
     },
     timers: {
@@ -133,4 +223,6 @@ export function resolveActiveOrder(
       activeOrder: null,
     },
   });
+
+  return activeOrderSource === "friend" ? consumeFriendOrderSlot(completedState) : completedState;
 }

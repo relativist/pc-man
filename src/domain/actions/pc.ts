@@ -1,52 +1,63 @@
+import { refreshAvailableOrders } from "./orders";
 import { normalizeGameState } from "../utils";
-import type { GameState, InstalledComponent, PcComponentCatalogItem } from "../types";
+import type { GameState, PcTierCatalogItem } from "../types";
 
-export function getPcPartCatalogItem(
-  gameState: GameState,
-  itemId: string,
-): PcComponentCatalogItem | undefined {
-  return gameState.world.availablePcParts.find((part) => part.id === itemId);
+export function getCurrentPcTier(gameState: GameState): PcTierCatalogItem | null {
+  if (gameState.pc.currentBuild) {
+    return gameState.pc.currentBuild;
+  }
+
+  if (!gameState.pc.currentTierId) {
+    return null;
+  }
+
+  return gameState.world.availablePcTiers.find((tier) => tier.id === gameState.pc.currentTierId) ?? null;
 }
 
-export function canAffordPcPart(gameState: GameState, itemId: string): boolean {
-  const part = getPcPartCatalogItem(gameState, itemId);
-  return Boolean(part && gameState.player.money >= part.price);
+export function getNextPcTier(gameState: GameState): PcTierCatalogItem | null {
+  const currentTier = getCurrentPcTier(gameState);
+
+  if (!currentTier) {
+    return gameState.world.availablePcTiers[0] ?? null;
+  }
+
+  return (
+    gameState.world.availablePcTiers.find((tier) => tier.level === currentTier.level + 1) ?? null
+  );
 }
 
-export function installPcPart(
+export function canAffordNextPcTier(gameState: GameState): boolean {
+  const nextTier = getNextPcTier(gameState);
+  return Boolean(nextTier && gameState.player.money >= nextTier.price);
+}
+
+export function upgradePcTier(
   gameState: GameState,
-  itemId: string,
+  now: Date = new Date(),
 ): GameState {
-  const part = getPcPartCatalogItem(gameState, itemId);
+  const nextTier = getNextPcTier(gameState);
 
-  if (!part) {
-    throw new Error(`PC part not found: ${itemId}`);
+  if (!nextTier) {
+    throw new Error("No next PC tier available");
   }
 
-  if (gameState.player.money < part.price) {
-    throw new Error(`Not enough money to buy PC part: ${itemId}`);
+  if (gameState.player.money < nextTier.price) {
+    throw new Error(`Not enough money to buy PC tier: ${nextTier.id}`);
   }
 
-  const installedComponent: InstalledComponent = {
-    itemId: part.id,
-    slot: part.slot,
-    level: part.level,
-    score: part.score,
-    purchasePrice: part.price,
-  };
-
-  return normalizeGameState({
-    ...gameState,
-    player: {
-      ...gameState.player,
-      money: gameState.player.money - part.price,
-    },
-    pc: {
-      ...gameState.pc,
-      components: {
-        ...gameState.pc.components,
-        [part.slot]: installedComponent,
+  return refreshAvailableOrders(
+    normalizeGameState({
+      ...gameState,
+      player: {
+        ...gameState.player,
+        money: gameState.player.money - nextTier.price,
       },
-    },
-  });
+      pc: {
+        ...gameState.pc,
+        currentTierId: nextTier.id,
+        currentBuild: nextTier,
+      },
+    }),
+    now,
+  );
 }

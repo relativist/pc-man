@@ -1,20 +1,13 @@
+import { getActivityProgress, useNow } from "../activity-progress";
 import type { GameState } from "../../domain";
 import {
   formatUiAgeYears,
   formatUiPercent,
   formatUiWeight,
+  roundUiValue,
 } from "../display-format";
 import { InfoHint } from "../info-hint";
 import { useGameStore } from "../store-hooks";
-
-const timerLabels = {
-  learning: "Чтение",
-  jobSearch: "Поиск работы",
-  salaryCycle: "Зарплатный цикл",
-  activeOrder: "Разовый заказ",
-  walk: "Прогулка",
-  healing: "Лечение",
-} as const;
 
 const housingLabels = {
   with_parents: "С родителями",
@@ -67,11 +60,16 @@ function getRiskTone(severity: "low" | "mid" | "high"): string {
 
 export function HeroPage() {
   const game = useGameStore((state) => state.game);
+  const actions = useGameStore((state) => state.actions);
+  const now = useNow();
   const livingPets = game.social.pets.filter((pet) => pet.isAlive);
   const propertyValue = game.player.propertyValue + game.player.realEstateValue;
   const currentHousing = getOwnedShopLot(game, "housing");
   const currentTransport = getOwnedShopLot(game, "transport");
   const currentThing = getOwnedShopLot(game, "things");
+  const healingProgress = game.timers.healing
+    ? getActivityProgress(game.timers.healing, now)
+    : null;
 
   const indicators = [
     { label: "Здоровье", value: game.player.health },
@@ -135,11 +133,17 @@ export function HeroPage() {
           severity: "mid" as const,
         }
       : null,
-    game.player.weight >= 110
+    game.player.weight > 100
       ? {
-          title: "Опасный вес",
-          description: "Высокий вес должен бить по здоровью и ускорять проблемы с возрастом.",
-          severity: "mid" as const,
+          title: "Смертельное ожирение",
+          description: "Вес перевалил за 100 кг. По текущим правилам это мгновенный game over.",
+          severity: "high" as const,
+        }
+      : game.player.weight >= 90
+        ? {
+            title: "Опасный вес",
+            description: "Вес опасно близок к 100 кг. Пора срочно снижать его тренировками.",
+            severity: "mid" as const,
         }
       : null,
     game.player.ageYears >= 75
@@ -157,16 +161,6 @@ export function HeroPage() {
         }
       : null,
   ].filter((risk): risk is NonNullable<typeof risk> => Boolean(risk));
-
-  const activeTimers = Object.entries(game.timers)
-    .filter((entry): entry is [keyof typeof timerLabels, NonNullable<(typeof game.timers)[keyof typeof game.timers]>] => Boolean(entry[1]))
-    .map(([key, timer]) => ({
-      key,
-      label: timerLabels[key],
-      startedAt: new Date(timer.startedAt).toLocaleString("ru-RU"),
-      endsAt: new Date(timer.endsAt).toLocaleString("ru-RU"),
-      referenceId: timer.referenceId,
-    }));
 
   return (
     <section className="page-grid dense-grid">
@@ -197,35 +191,87 @@ export function HeroPage() {
         </div>
       </div>
 
-      <div className="panel compact-panel">
-        <h3>Жизненные показатели</h3>
-        <div className="progress-list">
-          {indicators.map((indicator) => (
-            <div key={indicator.label} className="progress-row">
-              <div className="progress-label">
-                <span>{indicator.label}</span>
-                <span>{formatUiPercent(indicator.value)}</span>
+      <div className="hero-column-stack">
+        <div className="panel compact-panel">
+          <h3>Жизненные показатели</h3>
+          <div className="progress-list">
+            {indicators.map((indicator) => (
+              <div key={indicator.label} className="progress-row">
+                <div className="progress-label">
+                  <span>{indicator.label}</span>
+                  <span>{formatUiPercent(indicator.value)}</span>
+                </div>
+                <div className="progress-bar">
+                  <div
+                    className={`progress-fill progress-${getProgressTone(indicator.value)}`}
+                    style={{ width: `${indicator.value}%` }}
+                  />
+                </div>
               </div>
-              <div className="progress-bar">
-                <div
-                  className={`progress-fill progress-${getProgressTone(indicator.value)}`}
-                  style={{ width: `${indicator.value}%` }}
-                />
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
 
-      <div className="panel compact-panel">
-        <h3>Базовые характеристики</h3>
-        <div className="stat-list">
-          {heroProfile.map((item) => (
-            <div key={item.label} className="stat-item">
-              <span>{item.label}</span>
-              <strong>{item.value}</strong>
+        <div className="panel compact-panel">
+          <div className="section-head">
+            <div>
+              <div className="title-with-help">
+                <h3>Повседневные действия</h3>
+                <InfoHint text="Минимальный слой быта для MVP." />
+              </div>
             </div>
-          ))}
+          </div>
+          <div className="order-list life-action-list hero-action-list">
+            <article className="order-card compact-card">
+              <div className="title-with-help">
+                <h4>Поесть</h4>
+                <InfoHint text="Снимает голод, слегка повышает здоровье и настроение." />
+              </div>
+              <button
+                className="primary-button"
+                onClick={() => actions.eatMeal()}
+                disabled={game.player.money < 35}
+              >
+                Поесть за $35
+              </button>
+            </article>
+            <article className="order-card compact-card">
+              <div className="title-with-help">
+                <h4>Тренировка</h4>
+                <InfoHint text="Улучшает форму и здоровье, уменьшает вес, но повышает голод." />
+              </div>
+              <button className="primary-button" onClick={() => actions.doWorkout()}>
+                Сделать тренировку
+              </button>
+            </article>
+            <article className="order-card compact-card">
+              <div className="title-with-help">
+                <h4>Дорогое лечение</h4>
+                <InfoHint text="Идет по таймеру и после завершения автоматически омолаживает героя на 10 лет." />
+              </div>
+              <div className="shop-actions compact-actions">
+                {healingProgress ? (
+                  <div
+                    className="healing-ring"
+                    style={{
+                      background: `conic-gradient(#7fda89 ${healingProgress.percent}%, rgba(255, 255, 255, 0.08) ${healingProgress.percent}% 100%)`,
+                    }}
+                  >
+                    <div className="healing-ring-inner">
+                      <strong>{roundUiValue(healingProgress.percent)}%</strong>
+                    </div>
+                  </div>
+                ) : null}
+                <button
+                  className="primary-button"
+                  onClick={() => actions.startHealing()}
+                  disabled={Boolean(game.timers.healing) || game.player.money < 650}
+                >
+                  Начать лечение за $650
+                </button>
+              </div>
+            </article>
+          </div>
         </div>
       </div>
 
@@ -233,98 +279,67 @@ export function HeroPage() {
         <div className="section-head">
           <div>
             <div className="title-with-help">
-              <h3>Имущество героя</h3>
-              <InfoHint text="Здесь видны актуальные крупные покупки из магазина: дом, транспорт и заметная вещь." />
+              <h3>Базовые характеристики и имущество</h3>
+              <InfoHint text="Здесь собраны основные параметры героя и его крупные покупки из магазина." />
             </div>
           </div>
-          <span className="badge">${propertyValue}</span>
         </div>
-        <div className="stat-list compact-stats">
-          <div className="stat-item">
-            <span>Жилье</span>
-            <strong>{currentHousing?.title ?? "Пока без покупки"}</strong>
-          </div>
-          <div className="stat-item">
-            <span>Транспорт</span>
-            <strong>{currentTransport?.title ?? "Пока пешком"}</strong>
-          </div>
-          <div className="stat-item">
-            <span>Крутая вещь</span>
-            <strong>{currentThing?.title ?? "Пусто"}</strong>
-          </div>
-        </div>
-      </div>
-
-      <div className="panel compact-panel">
-        <h3>Квалификации</h3>
-        <div className="chips">
-          {activeSpecialties.map((track) => (
-            <div key={track.track} className="chip">
-              <span>{trackLabels[track.track] ?? track.track}</span>
-              <strong>
-                lvl {track.level} / {track.points} QP
-              </strong>
+        <div className="pc-spec-list">
+          {heroProfile.map((item) => (
+            <div key={item.label} className="stat-item">
+              <strong>{item.label}</strong>
+              <span>{item.value}</span>
             </div>
           ))}
+          <div className="stat-item">
+            <strong>Жилье</strong>
+            <span>{currentHousing?.title ?? "Пока без покупки"}</span>
+          </div>
+          <div className="stat-item">
+            <strong>Транспорт</strong>
+            <span>{currentTransport?.title ?? "Пока пешком"}</span>
+          </div>
+          <div className="stat-item">
+            <strong>Крутая вещь</strong>
+            <span>{currentThing?.title ?? "Пусто"}</span>
+          </div>
         </div>
       </div>
 
-      <div className="panel compact-panel">
-        <h3>Риски</h3>
-        {risks.length === 0 ? (
-          <p className="muted">
-            Критических рисков сейчас нет. Герой находится в стабильном состоянии.
-          </p>
-        ) : (
-          <div className="risk-list">
-            {risks.map((risk) => (
-              <article key={risk.title} className={`risk-card ${getRiskTone(risk.severity)}`}>
-                <strong>{risk.title}</strong>
-                <p>{risk.description}</p>
-              </article>
+      <div className="hero-side-stack">
+        <div className="panel compact-panel">
+          <h3>Риски</h3>
+          {risks.length === 0 ? (
+            <p className="muted">
+              Критических рисков сейчас нет. Герой находится в стабильном состоянии.
+            </p>
+          ) : (
+            <div className="risk-list">
+              {risks.map((risk) => (
+                <article key={risk.title} className={`risk-card ${getRiskTone(risk.severity)}`}>
+                  <strong>{risk.title}</strong>
+                  <p>{risk.description}</p>
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="panel compact-panel">
+          <h3>Квалификации</h3>
+          <div className="pc-spec-list">
+            {activeSpecialties.map((track) => (
+              <div key={track.track} className="stat-item">
+                <strong>{trackLabels[track.track] ?? track.track}</strong>
+                <span>
+                  lvl {track.level} / {track.points} QP
+                </span>
+              </div>
             ))}
           </div>
-        )}
+        </div>
       </div>
 
-      <div className="panel compact-panel">
-        <h3>Активные таймеры</h3>
-        {activeTimers.length === 0 ? (
-          <p className="muted">
-            Сейчас нет активных процессов. Здесь появятся чтение, поиск работы, заказ, прогулка или лечение.
-          </p>
-        ) : (
-          <div className="timer-list">
-            {activeTimers.map((timer) => (
-              <article key={timer.key} className="timer-card compact-card">
-                <strong>{timer.label}</strong>
-                <p>Старт: {timer.startedAt}</p>
-                <p>Окончание: {timer.endsAt}</p>
-                <p className="muted">Связанный объект: {timer.referenceId ?? "нет"}</p>
-              </article>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="panel compact-panel">
-        <h3>Журнал событий</h3>
-        {game.logs.length === 0 ? (
-          <p className="muted">
-            Пока пусто. Здесь появятся завершенные заказы, провалы и другие игровые события.
-          </p>
-        ) : (
-          <div className="log-list">
-            {game.logs.slice(0, 4).map((entry) => (
-              <article key={entry.id} className="log-item compact-card">
-                <span className="log-kind">{entry.kind}</span>
-                <p>{entry.message}</p>
-                <time>{new Date(entry.at).toLocaleString("ru-RU")}</time>
-              </article>
-            ))}
-          </div>
-        )}
-      </div>
     </section>
   );
 }

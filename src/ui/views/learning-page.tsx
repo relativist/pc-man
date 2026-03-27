@@ -25,6 +25,8 @@ const learningTracks = [
   "cto",
 ] as const;
 
+type LearningTrack = (typeof learningTracks)[number];
+
 type CatalogEntry = {
   book: {
     id: string;
@@ -42,6 +44,18 @@ type CatalogEntry = {
   isReading: boolean;
   isAvailable: boolean;
 };
+
+type TrackGridEntry =
+  | {
+      kind: "available";
+      track: LearningTrack;
+      entry: CatalogEntry;
+    }
+  | {
+      kind: "blocked";
+      track: LearningTrack;
+      entry: CatalogEntry;
+    };
 
 export function LearningPage() {
   const game = useGameStore((state) => state.game);
@@ -78,17 +92,22 @@ export function LearningPage() {
   const learningProgress = game.timers.learning
     ? getActivityProgress(game.timers.learning, now)
     : null;
-  const availableTrackEntries = learningTracks
+  const trackGridEntries = learningTracks
     .map((track) => {
-      const hasPendingTrackBook = catalog.some(
-        (entry) => entry.book.track === track && entry.isOwned && !entry.isCompleted,
-      );
+      const pendingTrackEntry =
+        catalog.find(
+          (entry) => entry.book.track === track && entry.isOwned && !entry.isCompleted,
+        ) ?? null;
 
-      if (hasPendingTrackBook) {
-        return null;
+      if (pendingTrackEntry) {
+        return {
+          kind: "blocked" as const,
+          track,
+          entry: pendingTrackEntry,
+        };
       }
 
-      return (
+      const availableEntry =
         catalog
           .filter(
             (entry) =>
@@ -103,10 +122,19 @@ export function LearningPage() {
             }
 
             return left.catalogIndex - right.catalogIndex;
-          })[0] ?? null
-      );
+          })[0] ?? null;
+
+      if (!availableEntry) {
+        return null;
+      }
+
+      return {
+        kind: "available" as const,
+        track,
+        entry: availableEntry,
+      };
     })
-    .filter((entry): entry is CatalogEntry => Boolean(entry));
+    .filter((entry): entry is TrackGridEntry => Boolean(entry));
   const completedCountByTrack = learningTracks
     .map((track) => ({
       track,
@@ -132,10 +160,6 @@ export function LearningPage() {
       statusBadges.push("Прочитано");
     } else if (entry.isOwned) {
       statusBadges.push("Куплена");
-    } else if (entry.isAvailable) {
-      statusBadges.push("Можно купить");
-    } else {
-      statusBadges.push("Закрыто");
     }
 
     return (
@@ -151,20 +175,19 @@ export function LearningPage() {
         </div>
 
         <h4>{entry.book.title}</h4>
-        <p className="muted compact-copy">{entry.book.funnyTitle}</p>
 
-        <div className="stat-list compact-stats compact-book-stats">
+        <div className="pc-spec-list">
           <div className="stat-item">
-            <span>Цена</span>
-            <strong>${entry.book.price}</strong>
+            <strong>Цена</strong>
+            <span>${entry.book.price}</span>
           </div>
           <div className="stat-item">
-            <span>Срок</span>
-            <strong>{entry.book.durationDays} дн.</strong>
+            <strong>Срок</strong>
+            <span>{entry.book.durationDays} дн.</span>
           </div>
           <div className="stat-item">
-            <span>QP</span>
-            <strong>+{entry.book.qualificationPoints} QP</strong>
+            <strong>QP</strong>
+            <span>+{entry.book.qualificationPoints} QP</span>
           </div>
         </div>
 
@@ -190,7 +213,7 @@ export function LearningPage() {
 
   return (
     <section className="page-grid">
-      <div className="panel hero-headline">
+      <div className="panel hero-headline learning-summary-panel">
         <p className="eyebrow">Обучение</p>
         <div className="title-with-help">
           <h2>Книги и рост квалификации</h2>
@@ -204,20 +227,16 @@ export function LearningPage() {
           </div>
           <div>
             <span className="metric-label">По трекам</span>
-            <strong>{availableTrackEntries.length}</strong>
+            <strong>{trackGridEntries.length}</strong>
           </div>
           <div>
             <span className="metric-label">Прочитано</span>
             <strong>{completedEntriesCount}</strong>
           </div>
-          <div>
-            <span className="metric-label">Текущая книга</span>
-            <strong>{activeBook ? activeBook.title : queuedBook ? queuedBook.title : "Нет"}</strong>
-          </div>
         </div>
       </div>
 
-      <div className="panel">
+      <div className="panel learning-current-panel">
         <div className="section-head">
           <div>
             <div className="title-with-help">
@@ -229,29 +248,26 @@ export function LearningPage() {
         </div>
 
         {activeBook && learningProgress ? (
-          <div className="timer-card">
+          <div className="timer-card learning-current-card">
             <strong>{activeBook.title}</strong>
-            <p>{activeBook.funnyTitle}</p>
-            <p>Трек: {trackTitles[activeBook.track] ?? activeBook.track}</p>
-            <p>QP: +{activeBook.qualificationPoints}</p>
+            <p className="muted">
+              {trackTitles[activeBook.track] ?? activeBook.track} · +{activeBook.qualificationPoints} QP
+            </p>
             <div className="progress-bar">
               <div
                 className="progress-fill progress-good"
                 style={{ width: `${learningProgress.percent}%` }}
               />
             </div>
-            <p>Прогресс: {formatUiPercent(learningProgress.percent)}</p>
             <p className="muted">
-              Осталось примерно {learningProgress.remainingLabel}. Книга завершится автоматически.
+              Прогресс: {formatUiPercent(learningProgress.percent)}. Осталось примерно {learningProgress.remainingLabel}.
             </p>
           </div>
         ) : queuedBook ? (
-          <div className="timer-card">
+          <div className="timer-card learning-current-card">
             <strong>{queuedBook.title}</strong>
-            <p>{queuedBook.funnyTitle}</p>
             <p className="muted">
-              Книга уже куплена в сохранении, но еще не читалась. Сначала дочитай ее, потом покупай
-              следующую.
+              Книга уже куплена и ждёт запуска. Пока она не завершена, следующую купить нельзя.
             </p>
             <div className="shop-actions">
               <button
@@ -263,9 +279,12 @@ export function LearningPage() {
             </div>
           </div>
         ) : (
-          <p className="muted">
-            Свободно. Выбери книгу из доступных ниже: покупка сразу переведет ее в active reading.
-          </p>
+          <div className="timer-card learning-current-card">
+            <strong>Сейчас свободно</strong>
+            <p className="muted">
+              Выбери книгу ниже. После покупки она сразу перейдёт в текущее чтение.
+            </p>
+          </div>
         )}
       </div>
 
@@ -291,7 +310,7 @@ export function LearningPage() {
               <InfoHint text="В каждом направлении показывается только ближайшая доступная книга. Закрытые книги не выводятся." />
             </div>
           </div>
-          <span className="badge">{availableTrackEntries.length} на экране</span>
+          <span className="badge">{trackGridEntries.length} на экране</span>
         </div>
 
         <p className="muted">
@@ -300,19 +319,24 @@ export function LearningPage() {
             : "Книги идут по возрастанию уровня внутри каждого трека."}
         </p>
 
-        {availableTrackEntries.length > 0 ? (
+        {trackGridEntries.length > 0 ? (
           <div className="book-grid">
-            {availableTrackEntries.map((entry) =>
-              renderBookCard(entry, {
-                actionLabel: "Купить и читать",
-                actionDisabled: Boolean(blockingEntry) || game.player.money < entry.book.price,
-                actionHint: blockingEntry
-                  ? `Сначала заверши: ${blockingEntry.book.title}`
-                  : game.player.money < entry.book.price
-                    ? "Не хватает денег"
-                    : undefined,
-                onAction: () => actions.buyBook(entry.book.id),
-              }),
+            {trackGridEntries.map((trackEntry) =>
+              trackEntry.kind === "available"
+                ? renderBookCard(trackEntry.entry, {
+                    actionLabel: "Купить и читать",
+                    actionDisabled: Boolean(blockingEntry) || game.player.money < trackEntry.entry.book.price,
+                    actionHint:
+                      !blockingEntry && game.player.money < trackEntry.entry.book.price
+                        ? "Не хватает денег"
+                        : undefined,
+                    onAction: () => actions.buyBook(trackEntry.entry.book.id),
+                  })
+                : renderBookCard(trackEntry.entry, {
+                    actionLabel: "Ожидает чтения",
+                    actionDisabled: true,
+                    onAction: () => undefined,
+                  }),
             )}
           </div>
         ) : (

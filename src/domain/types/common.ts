@@ -2,7 +2,7 @@ export type IsoDateString = string;
 
 export type Currency = "usd";
 
-export type GameOverReason = "hunger" | "illness" | "old_age" | "other" | null;
+export type GameOverReason = "hunger" | "obesity" | "illness" | "old_age" | "other" | null;
 
 export type CareerTrackId =
   | "qa"
