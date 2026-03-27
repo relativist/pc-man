@@ -28,8 +28,8 @@ export function CareerPage() {
     : null;
 
   return (
-    <section className="page-grid">
-      <div className="panel hero-headline">
+    <section className="page-grid dense-grid">
+      <div className="panel hero-headline wide-panel">
         <p className="eyebrow">Карьера</p>
         <h2>Работа и вакансии</h2>
         <p className="lede">
@@ -60,7 +60,7 @@ export function CareerPage() {
         </div>
       </div>
 
-      <div className="panel">
+      <div className="panel compact-panel">
         <div className="section-head">
           <div>
             <h3>Текущая должность</h3>
@@ -77,7 +77,7 @@ export function CareerPage() {
         </div>
 
         {currentVacancy ? (
-          <div className="order-card">
+          <div className="order-card compact-card">
             <div className="order-meta">
               <span className="badge">{trackLabels[currentVacancy.track] ?? currentVacancy.track}</span>
               <span className="badge">ступень {currentVacancy.careerLevel}</span>
@@ -110,7 +110,7 @@ export function CareerPage() {
         )}
       </div>
 
-      <div className="panel wide-panel">
+      <div className="panel compact-panel">
         <div className="section-head">
           <div>
             <h3>Поиск работы</h3>
@@ -168,7 +168,7 @@ export function CareerPage() {
               );
 
               return (
-                <article key={vacancy.id} className="order-card">
+                <article key={vacancy.id} className="order-card compact-card">
                   <div className="order-meta">
                     <span className="badge">{trackLabels[vacancy.track] ?? vacancy.track}</span>
                     <span className="badge">ступень {vacancy.careerLevel}</span>

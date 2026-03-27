@@ -14,6 +14,15 @@ const navItems = [
   { to: "/life", label: "Быт и Здоровье" },
 ];
 
+const trackTitles: Record<string, string> = {
+  qa: "QA",
+  backend: "Backend",
+  frontend: "Frontend",
+  pm: "PM",
+  pentester: "Pentester",
+  analyst: "Analyst",
+};
+
 function getEncounterName(encounter: PendingSocialEncounter): string {
   if (encounter.kind === "friend") {
     return encounter.friend.name;
@@ -38,14 +47,28 @@ function getEncounterBadge(encounter: PendingSocialEncounter): string {
   return "Питомец";
 }
 
+function getGameOverReasonLabel(reason: string | null): string {
+  if (reason === "hunger") {
+    return "Голод";
+  }
+
+  if (reason === "illness") {
+    return "Критическое здоровье";
+  }
+
+  if (reason === "old_age") {
+    return "Старость";
+  }
+
+  return "Неизвестная причина";
+}
+
 export function AppLayout() {
   const game = useGameStore((state) => state.game);
-  const settleToNow = useGameStore((state) => state.actions.settleToNow);
-  const acceptEncounter = useGameStore((state) => state.actions.acceptPendingSocialEncounter);
-  const rejectEncounter = useGameStore((state) => state.actions.rejectPendingSocialEncounter);
-  const markNotificationsSeen = useGameStore((state) => state.actions.markNotificationsSeen);
+  const actions = useGameStore((state) => state.actions);
   const [isNotificationDrawerOpen, setNotificationDrawerOpen] = useState(false);
   const previousUnreadCountRef = useRef(0);
+  const notificationAutoOpenedRef = useRef(false);
 
   const { player, career, pc, orders, timers, logs, social, meta } = game;
   const pendingEncounter = social.pendingEncounters[0] ?? null;
@@ -55,8 +78,8 @@ export function AppLayout() {
   const latestLogAt = logs[0]?.at ?? null;
 
   useEffect(() => {
-    settleToNow();
-  }, [settleToNow]);
+    actions.settleToNow();
+  }, [actions]);
 
   useEffect(() => {
     const dueTimers = Object.values(timers).filter(
@@ -74,14 +97,15 @@ export function AppLayout() {
 
     const timeoutMs = Math.max(0, nextDueAt - Date.now() + 80);
     const timeoutId = window.setTimeout(() => {
-      settleToNow();
+      actions.settleToNow();
     }, timeoutMs);
 
     return () => window.clearTimeout(timeoutId);
-  }, [settleToNow, timers]);
+  }, [actions, timers]);
 
   useEffect(() => {
     if (unreadCount > previousUnreadCountRef.current) {
+      notificationAutoOpenedRef.current = true;
       setNotificationDrawerOpen(true);
     }
 
@@ -89,10 +113,132 @@ export function AppLayout() {
   }, [unreadCount]);
 
   useEffect(() => {
-    if (isNotificationDrawerOpen && latestLogAt && meta.lastViewedLogAt !== latestLogAt) {
-      markNotificationsSeen(latestLogAt);
+    if (!isNotificationDrawerOpen || !notificationAutoOpenedRef.current) {
+      return undefined;
     }
-  }, [isNotificationDrawerOpen, latestLogAt, markNotificationsSeen, meta.lastViewedLogAt]);
+
+    const timeoutId = window.setTimeout(() => {
+      notificationAutoOpenedRef.current = false;
+      setNotificationDrawerOpen(false);
+    }, 2000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [isNotificationDrawerOpen, unreadCount]);
+
+  useEffect(() => {
+    if (isNotificationDrawerOpen && latestLogAt && meta.lastViewedLogAt !== latestLogAt) {
+      actions.markNotificationsSeen(latestLogAt);
+    }
+  }, [actions, isNotificationDrawerOpen, latestLogAt, meta.lastViewedLogAt]);
+
+  if (meta.isGameOver || !player.isAlive) {
+    const qualificationSummary = Object.values(game.skills.tracks)
+      .sort((left, right) => right.points - left.points)
+      .filter((track) => track.points > 0)
+      .map((track) => ({
+        label: trackTitles[track.track] ?? track.track,
+        value: `lvl ${track.level} / ${track.points} QP`,
+      }));
+
+    return (
+      <div className="app-shell game-over-shell">
+        <section className="panel game-over-panel">
+          <p className="eyebrow">Game Over</p>
+          <h1>{player.name}</h1>
+          <p className="lede">
+            Игра завершена. Обычный интерфейс скрыт, пока не будет запущена новая сессия.
+          </p>
+
+          <div className="hero-metrics">
+            <div>
+              <span className="metric-label">Причина смерти</span>
+              <strong>{getGameOverReasonLabel(meta.gameOverReason)}</strong>
+            </div>
+            <div>
+              <span className="metric-label">Возраст</span>
+              <strong>{player.ageYears} лет</strong>
+            </div>
+            <div>
+              <span className="metric-label">Деньги</span>
+              <strong>${player.money}</strong>
+            </div>
+            <div>
+              <span className="metric-label">Капитал</span>
+              <strong>${player.capital}</strong>
+            </div>
+          </div>
+
+          <div className="game-over-grid">
+            <div className="timer-card">
+              <strong>Итоги прохождения</strong>
+              <div className="stat-list compact-stats">
+                <div className="stat-item">
+                  <span>Прочитано книг</span>
+                  <strong>{game.learning.completedBookIds.length}</strong>
+                </div>
+                <div className="stat-item">
+                  <span>Выполнено заказов</span>
+                  <strong>{game.orders.completedOrderIds.length}</strong>
+                </div>
+                <div className="stat-item">
+                  <span>Провалено заказов</span>
+                  <strong>{game.orders.failedOrderIds.length}</strong>
+                </div>
+                <div className="stat-item">
+                  <span>Работа</span>
+                  <strong>{career.currentJobId ? "Была активна" : "Не устроился"}</strong>
+                </div>
+              </div>
+            </div>
+
+            <div className="timer-card">
+              <strong>Семья и окружение</strong>
+              <div className="stat-list compact-stats">
+                <div className="stat-item">
+                  <span>Супруга</span>
+                  <strong>{social.spouse ? social.spouse.name : "Нет"}</strong>
+                </div>
+                <div className="stat-item">
+                  <span>Дети</span>
+                  <strong>{social.childrenCount}</strong>
+                </div>
+                <div className="stat-item">
+                  <span>Друзья</span>
+                  <strong>{social.friends.filter((friend) => friend.isActive).length}</strong>
+                </div>
+                <div className="stat-item">
+                  <span>Питомцы</span>
+                  <strong>{social.pets.filter((pet) => pet.isAlive).length}</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="panel game-over-summary">
+            <h3>Квалификации</h3>
+            {qualificationSummary.length > 0 ? (
+              <div className="chips">
+                {qualificationSummary.map((item) => (
+                  <div key={item.label} className="chip">
+                    <span>{item.label}</span>
+                    <strong>{item.value}</strong>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="muted">Квалификации не успели вырасти до заметного результата.</p>
+            )}
+          </div>
+
+          <div className="game-over-actions">
+            <button className="primary-button" onClick={() => actions.resetGame()}>
+              Начать заново
+            </button>
+          </div>
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div className="app-shell">
@@ -114,7 +260,10 @@ export function AppLayout() {
 
           <button
             className="notification-toggle"
-            onClick={() => setNotificationDrawerOpen((current) => !current)}
+            onClick={() => {
+              notificationAutoOpenedRef.current = false;
+              setNotificationDrawerOpen((current) => !current);
+            }}
           >
             Уведомления
             <span className="badge">{unreadCount} новых</span>
@@ -158,7 +307,10 @@ export function AppLayout() {
           </div>
           <button
             className="secondary-button"
-            onClick={() => setNotificationDrawerOpen(false)}
+            onClick={() => {
+              notificationAutoOpenedRef.current = false;
+              setNotificationDrawerOpen(false);
+            }}
           >
             Скрыть
           </button>
@@ -209,13 +361,13 @@ export function AppLayout() {
             <div className="modal-actions">
               <button
                 className="secondary-button"
-                onClick={() => rejectEncounter(pendingEncounter.id)}
+                onClick={() => actions.rejectPendingSocialEncounter(pendingEncounter.id)}
               >
                 Отклонить
               </button>
               <button
                 className="primary-button"
-                onClick={() => acceptEncounter(pendingEncounter.id)}
+                onClick={() => actions.acceptPendingSocialEncounter(pendingEncounter.id)}
               >
                 Принять
               </button>

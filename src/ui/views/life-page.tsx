@@ -1,3 +1,4 @@
+import { getActivityProgress, useNow } from "../activity-progress";
 import { useGameStore } from "../store-hooks";
 
 function getHealthStatus(value: number): string {
@@ -15,6 +16,10 @@ function getHealthStatus(value: number): string {
 export function LifePage() {
   const game = useGameStore((state) => state.game);
   const actions = useGameStore((state) => state.actions);
+  const now = useNow();
+  const healingProgress = game.timers.healing
+    ? getActivityProgress(game.timers.healing, now)
+    : null;
 
   const healthMetrics = [
     { label: "Здоровье", value: game.player.health },
@@ -85,10 +90,10 @@ export function LifePage() {
             <p className="muted">Минимальный слой быта для MVP.</p>
           </div>
         </div>
-        <div className="order-list">
-          <article className="order-card">
+        <div className="order-list life-action-list">
+          <article className="order-card compact-card">
             <h4>Поесть</h4>
-            <p>Снимает голод, слегка повышает здоровье и настроение, но может добавить вес.</p>
+            <p className="muted compact-copy">Снимает голод, слегка повышает здоровье и настроение.</p>
             <button
               className="primary-button"
               onClick={() => actions.eatMeal()}
@@ -97,30 +102,26 @@ export function LifePage() {
               Поесть за $35
             </button>
           </article>
-          <article className="order-card">
+          <article className="order-card compact-card">
             <h4>Тренировка</h4>
-            <p>Улучшает форму и здоровье, уменьшает вес, но повышает голод.</p>
-            <button className="secondary-button" onClick={() => actions.doWorkout()}>
+            <p className="muted compact-copy">Улучшает форму и здоровье, уменьшает вес, но повышает голод.</p>
+            <button className="primary-button" onClick={() => actions.doWorkout()}>
               Сделать тренировку
             </button>
           </article>
-          <article className="order-card">
+          <article className="order-card compact-card">
             <h4>Дорогое лечение</h4>
-            <p>Стоит дорого, идет по таймеру и после завершения омолаживает героя на 10 лет.</p>
-            <div className="shop-actions">
+            <p className="muted compact-copy">
+              Идет по таймеру и после завершения автоматически омолаживает героя на 10 лет.
+            </p>
+            <div className="shop-actions compact-actions">
+              <span className="badge">$650</span>
               <button
                 className="primary-button"
                 onClick={() => actions.startHealing()}
                 disabled={Boolean(game.timers.healing) || game.player.money < 650}
               >
                 Начать лечение
-              </button>
-              <button
-                className="secondary-button"
-                onClick={() => actions.completeHealing()}
-                disabled={!game.timers.healing}
-              >
-                Завершить лечение
               </button>
             </div>
           </article>
@@ -161,11 +162,22 @@ export function LifePage() {
 
       <div className="panel wide-panel">
         <h3>Таймер лечения</h3>
-        {game.timers.healing ? (
+        {game.timers.healing && healingProgress ? (
           <div className="timer-card">
             <strong>Активен курс лечения</strong>
-            <p>Старт: {new Date(game.timers.healing.startedAt).toLocaleString("ru-RU")}</p>
-            <p>Окончание: {new Date(game.timers.healing.endsAt).toLocaleString("ru-RU")}</p>
+            <div className="progress-bar">
+              <div
+                className="progress-fill progress-good"
+                style={{ width: `${healingProgress.percent}%` }}
+              />
+            </div>
+            <p>Прогресс: {healingProgress.percent}%</p>
+            <p className="muted">
+              Осталось примерно {healingProgress.remainingLabel}. Лечение завершится автоматически.
+            </p>
+            <p className="muted">
+              Окончание: {new Date(game.timers.healing.endsAt).toLocaleString("ru-RU")}
+            </p>
           </div>
         ) : (
           <p className="muted">Сейчас лечение не запущено.</p>

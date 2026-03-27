@@ -12,6 +12,17 @@ const trackTitles: Record<string, string> = {
   cto: "CTO",
 };
 
+const learningTracks = [
+  "universal",
+  "qa",
+  "backend",
+  "frontend",
+  "pm",
+  "analyst",
+  "pentester",
+  "cto",
+] as const;
+
 type CatalogEntry = {
   book: {
     id: string;
@@ -23,6 +34,7 @@ type CatalogEntry = {
     durationDays: number;
     qualificationPoints: number;
   };
+  catalogIndex: number;
   isOwned: boolean;
   isCompleted: boolean;
   isReading: boolean;
@@ -38,7 +50,7 @@ export function LearningPage() {
     (left, right) => right.points - left.points,
   );
 
-  const catalog: CatalogEntry[] = game.world.availableBooks.map((book) => {
+  const catalog: CatalogEntry[] = game.world.availableBooks.map((book, catalogIndex) => {
     const isOwned = game.learning.ownedBookIds.includes(book.id);
     const isCompleted = game.learning.completedBookIds.includes(book.id);
     const isReading = game.learning.activeBookId === book.id;
@@ -46,6 +58,7 @@ export function LearningPage() {
 
     return {
       book,
+      catalogIndex,
       isOwned,
       isCompleted,
       isReading,
@@ -56,14 +69,47 @@ export function LearningPage() {
   const activeEntry = catalog.find((entry) => entry.isReading) ?? null;
   const activeBook = activeEntry?.book ?? null;
   const queuedOwnedEntries = catalog.filter((entry) => entry.isOwned && !entry.isCompleted && !entry.isReading);
-  const availableToBuyEntries = catalog.filter((entry) => entry.isAvailable && !entry.isOwned);
-  const completedEntries = catalog.filter((entry) => entry.isCompleted);
-  const lockedEntries = catalog.filter((entry) => !entry.isAvailable && !entry.isOwned);
   const blockingEntry = activeEntry ?? queuedOwnedEntries[0] ?? null;
   const queuedBook = queuedOwnedEntries[0]?.book ?? null;
   const learningProgress = game.timers.learning
     ? getActivityProgress(game.timers.learning, now)
     : null;
+  const availableTrackEntries = learningTracks
+    .map((track) => {
+      const hasPendingTrackBook = catalog.some(
+        (entry) => entry.book.track === track && entry.isOwned && !entry.isCompleted,
+      );
+
+      if (hasPendingTrackBook) {
+        return null;
+      }
+
+      return (
+        catalog
+          .filter(
+            (entry) =>
+              entry.book.track === track &&
+              entry.isAvailable &&
+              !entry.isOwned &&
+              !entry.isCompleted,
+          )
+          .sort((left, right) => {
+            if (left.book.level !== right.book.level) {
+              return left.book.level - right.book.level;
+            }
+
+            return left.catalogIndex - right.catalogIndex;
+          })[0] ?? null
+      );
+    })
+    .filter((entry): entry is CatalogEntry => Boolean(entry));
+  const completedCountByTrack = learningTracks
+    .map((track) => ({
+      track,
+      count: catalog.filter((entry) => entry.book.track === track && entry.isCompleted).length,
+    }))
+    .filter((item) => item.count > 0);
+  const completedEntriesCount = catalog.filter((entry) => entry.isCompleted).length;
 
   function renderBookCard(
     entry: CatalogEntry,
@@ -90,7 +136,7 @@ export function LearningPage() {
     }
 
     return (
-      <article key={entry.book.id} className="order-card">
+      <article key={entry.book.id} className="order-card compact-card">
         <div className="order-meta">
           <span className="badge">{trackTitles[entry.book.track] ?? entry.book.track}</span>
           <span className="badge">lvl {entry.book.level}</span>
@@ -102,19 +148,19 @@ export function LearningPage() {
         </div>
 
         <h4>{entry.book.title}</h4>
-        <p>{entry.book.funnyTitle}</p>
+        <p className="muted compact-copy">{entry.book.funnyTitle}</p>
 
-        <div className="stat-list compact-stats">
+        <div className="stat-list compact-stats compact-book-stats">
           <div className="stat-item">
-            <span>Цена</span>
+            <span>$</span>
             <strong>${entry.book.price}</strong>
           </div>
           <div className="stat-item">
-            <span>Длительность</span>
+            <span>Срок</span>
             <strong>{entry.book.durationDays} дн.</strong>
           </div>
           <div className="stat-item">
-            <span>Награда</span>
+            <span>QP</span>
             <strong>+{entry.book.qualificationPoints} QP</strong>
           </div>
         </div>
@@ -155,12 +201,12 @@ export function LearningPage() {
             <strong>${game.player.money}</strong>
           </div>
           <div>
-            <span className="metric-label">Можно купить</span>
-            <strong>{blockingEntry ? 0 : availableToBuyEntries.length}</strong>
+            <span className="metric-label">По трекам</span>
+            <strong>{availableTrackEntries.length}</strong>
           </div>
           <div>
             <span className="metric-label">Прочитано</span>
-            <strong>{completedEntries.length}</strong>
+            <strong>{completedEntriesCount}</strong>
           </div>
           <div>
             <span className="metric-label">Текущая книга</span>
@@ -236,27 +282,27 @@ export function LearningPage() {
       <div className="panel wide-panel">
         <div className="section-head">
           <div>
-            <h3>Библиотека</h3>
+            <h3>Книги по трекам</h3>
             <p className="muted">
-              Каталог разделен по состояниям: что можно купить, что уже куплено, что прочитано и
-              что пока закрыто.
+              В каждом направлении показывается только ближайшая доступная книга. Закрытые книги не
+              выводятся.
             </p>
           </div>
-          <span className="badge">{catalog.length} книг</span>
+          <span className="badge">{availableTrackEntries.length} на экране</span>
         </div>
 
         <div className="learning-section-grid">
           <section className="learning-section">
-            <h4>Можно купить</h4>
+            <h4>Доступно</h4>
             <p className="muted">
               {blockingEntry
-                ? "Покупка заблокирована, пока не завершена текущая книга."
-                : "Покупка сразу списывает деньги и запускает чтение."}
+                ? "Покупка новых книг заблокирована, пока не завершена текущая."
+                : "Книги идут по возрастанию уровня внутри каждого трека."}
             </p>
 
-            {availableToBuyEntries.length > 0 ? (
+            {availableTrackEntries.length > 0 ? (
               <div className="order-list">
-                {availableToBuyEntries.map((entry) =>
+                {availableTrackEntries.map((entry) =>
                   renderBookCard(entry, {
                     actionLabel: "Купить и читать",
                     actionKind: "primary",
@@ -298,28 +344,20 @@ export function LearningPage() {
           </section>
 
           <section className="learning-section">
-            <h4>Прочитано</h4>
-            <p className="muted">Эти книги уже выдали QP и больше не требуют действий.</p>
+            <h4>Архив</h4>
+            <p className="muted">Вместо длинного списка здесь только короткая сводка по прочитанному.</p>
 
-            {completedEntries.length > 0 ? (
-              <div className="order-list">
-                {completedEntries.map((entry) => renderBookCard(entry))}
+            {completedCountByTrack.length > 0 ? (
+              <div className="chips">
+                {completedCountByTrack.map((item) => (
+                  <div key={item.track} className="chip">
+                    <span>{trackTitles[item.track] ?? item.track}</span>
+                    <strong>{item.count} проч.</strong>
+                  </div>
+                ))}
               </div>
             ) : (
               <p className="muted">Пока нет завершенных книг.</p>
-            )}
-          </section>
-
-          <section className="learning-section">
-            <h4>Пока закрыто</h4>
-            <p className="muted">Эти книги откроются после роста нужной квалификации.</p>
-
-            {lockedEntries.length > 0 ? (
-              <div className="order-list">
-                {lockedEntries.map((entry) => renderBookCard(entry))}
-              </div>
-            ) : (
-              <p className="muted">Все доступные по уровню книги уже открыты.</p>
             )}
           </section>
         </div>

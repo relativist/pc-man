@@ -222,11 +222,11 @@ function resolvePetStatus(
   pets: PetState[],
   now: Date,
   takeRoll: () => number,
-): { pets: PetState[]; deceasedPets: PetState[] } {
-  const deceasedPets: PetState[] = [];
+): { pets: PetState[]; deceasedPet: PetState | null } {
+  let deceasedPet: PetState | null = null;
 
   const nextPets = pets.map((pet) => {
-    if (!pet.isAlive) {
+    if (!pet.isAlive || deceasedPet) {
       return pet;
     }
 
@@ -244,18 +244,17 @@ function resolvePetStatus(
       return pet;
     }
 
-    const deceasedPet = {
+    deceasedPet = {
       ...pet,
       isAlive: false,
     };
-    deceasedPets.push(deceasedPet);
 
     return deceasedPet;
   });
 
   return {
     pets: nextPets,
-    deceasedPets,
+    deceasedPet,
   };
 }
 
@@ -336,10 +335,10 @@ export function completeWalk(
   }
 
   const takeRoll = createRollReader(rolls);
-  const outcome = pickByRoll(walkOutcomes, takeRoll());
   const friendRoll = takeRoll();
   const spouseRoll = takeRoll();
   const petRoll = takeRoll();
+  const encounterRoll = takeRoll();
 
   const nextFriend =
     gameState.social.friends.length + countPendingEncounters(gameState.social.pendingEncounters, "friend") <
@@ -361,17 +360,52 @@ export function completeWalk(
       ? createPetEncounter(now, petRoll)
       : null;
 
-  const { pets: resolvedPets, deceasedPets } = resolvePetStatus(gameState.social.pets, now, takeRoll);
+  const { pets: resolvedPets, deceasedPet } = resolvePetStatus(gameState.social.pets, now, takeRoll);
+  const encounterCandidates = [
+    nextFriend
+      ? {
+          kind: "friend" as const,
+          encounter: nextFriend,
+          moodDelta: 4,
+        }
+      : null,
+    nextSpouse
+      ? {
+          kind: "spouse" as const,
+          encounter: nextSpouse,
+          moodDelta: 6,
+        }
+      : null,
+    nextPet
+      ? {
+          kind: "pet" as const,
+          encounter: nextPet,
+          moodDelta: 5,
+        }
+      : null,
+  ].filter((candidate): candidate is NonNullable<typeof candidate> => Boolean(candidate));
+  const selectedEncounter =
+    deceasedPet || encounterCandidates.length === 0
+      ? null
+      : pickByRoll(encounterCandidates, encounterRoll);
+  const selectedWalkOutcome =
+    deceasedPet || selectedEncounter ? null : pickByRoll(walkOutcomes, takeRoll());
 
-  const nextMoney = clamp(gameState.player.money + outcome.moneyDelta, 0, 1_000_000);
-  const nextHealth = clamp(gameState.player.health + outcome.healthDelta, 0, 100);
+  const nextMoney = clamp(
+    gameState.player.money + (selectedWalkOutcome?.moneyDelta ?? 0),
+    0,
+    1_000_000,
+  );
+  const nextHealth = clamp(
+    gameState.player.health + (selectedWalkOutcome?.healthDelta ?? 0),
+    0,
+    100,
+  );
   const nextMood = clamp(
     gameState.player.mood +
-      outcome.moodDelta +
-      (nextFriend ? 4 : 0) +
-      (nextSpouse ? 6 : 0) +
-      (nextPet ? 5 : 0) -
-      deceasedPets.length * 10,
+      (selectedWalkOutcome?.moodDelta ?? 0) +
+      (selectedEncounter?.moodDelta ?? 0) -
+      (deceasedPet ? 10 : 0),
     0,
     100,
   );
@@ -390,12 +424,9 @@ export function completeWalk(
     social: {
       ...gameState.social,
       pets: resolvedPets,
-      pendingEncounters: [
-        ...gameState.social.pendingEncounters,
-        ...[nextFriend, nextSpouse, nextPet].filter(
-          (encounter): encounter is PendingSocialEncounter => Boolean(encounter),
-        ),
-      ],
+      pendingEncounters: selectedEncounter
+        ? [...gameState.social.pendingEncounters, selectedEncounter.encounter]
+        : gameState.social.pendingEncounters,
     },
     timers: {
       ...gameState.timers,
@@ -403,40 +434,42 @@ export function completeWalk(
     },
   });
 
-  const logs: SocialLogDraft[] = [
-    {
-      kind: "walk_completed",
-      message: `${outcome.title}: ${outcome.message}`,
-    },
-  ];
-
-  if (nextFriend) {
-    logs.push({
-      kind: "friend_found",
-      message: `На прогулке появился новый знакомый: ${nextFriend.friend.name}. Знакомство ждет подтверждения.`,
-    });
-  }
-
-  if (nextSpouse) {
-    logs.push({
-      kind: "spouse_found",
-      message: `Герой познакомился с ${nextSpouse.spouse.name}. Реши, продолжать ли эту социальную историю.`,
-    });
-  }
-
-  if (nextPet) {
-    logs.push({
-      kind: "pet_found",
-      message: `Домой напрашивается ${nextPet.pet.species} по имени ${nextPet.pet.name}. Нужно принять решение.`,
-    });
-  }
-
-  deceasedPets.forEach((pet) => {
-    logs.push({
-      kind: "pet_died",
-      message: `${pet.species} ${pet.name} прожил свою яркую жизнь и ушел на радугу.`,
-    });
-  });
+  const logs: SocialLogDraft[] = deceasedPet
+    ? [
+        {
+          kind: "pet_died",
+          message: `${deceasedPet.species} ${deceasedPet.name} прожил свою яркую жизнь и ушел на радугу.`,
+        },
+      ]
+    : selectedEncounter?.kind === "friend"
+      ? [
+          {
+            kind: "friend_found",
+            message: `На прогулке появился новый знакомый: ${selectedEncounter.encounter.friend.name}. Знакомство ждет подтверждения.`,
+          },
+        ]
+      : selectedEncounter?.kind === "spouse"
+        ? [
+            {
+              kind: "spouse_found",
+              message: `Герой познакомился с ${selectedEncounter.encounter.spouse.name}. Реши, продолжать ли эту социальную историю.`,
+            },
+          ]
+        : selectedEncounter?.kind === "pet"
+          ? [
+              {
+                kind: "pet_found",
+                message: `Домой напрашивается ${selectedEncounter.encounter.pet.species} по имени ${selectedEncounter.encounter.pet.name}. Нужно принять решение.`,
+              },
+            ]
+          : selectedWalkOutcome
+            ? [
+                {
+                  kind: "walk_completed",
+                  message: `${selectedWalkOutcome.title}: ${selectedWalkOutcome.message}`,
+                },
+              ]
+            : [];
 
   return {
     game: nextState,

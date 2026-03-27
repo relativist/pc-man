@@ -16,6 +16,15 @@ const housingLabels = {
   own_home: "Свое жилье",
 } as const;
 
+const trackLabels: Record<string, string> = {
+  qa: "QA",
+  backend: "Backend",
+  frontend: "Frontend",
+  pm: "PM",
+  pentester: "Pentester",
+  analyst: "Analyst",
+};
+
 function getOwnedShopLot(
   game: GameState,
   section: "things" | "housing" | "transport",
@@ -154,8 +163,8 @@ export function HeroPage() {
     }));
 
   return (
-    <section className="page-grid">
-      <div className="panel hero-headline">
+    <section className="page-grid dense-grid">
+      <div className="panel hero-headline wide-panel">
         <p className="eyebrow">Главная / Герой</p>
         <h2>{game.player.name}</h2>
         <p className="lede">
@@ -183,7 +192,7 @@ export function HeroPage() {
         </div>
       </div>
 
-      <div className="panel">
+      <div className="panel compact-panel">
         <h3>Жизненные показатели</h3>
         <div className="progress-list">
           {indicators.map((indicator) => (
@@ -203,7 +212,7 @@ export function HeroPage() {
         </div>
       </div>
 
-      <div className="panel">
+      <div className="panel compact-panel">
         <h3>Базовые характеристики</h3>
         <div className="stat-list">
           {heroProfile.map((item) => (
@@ -215,7 +224,7 @@ export function HeroPage() {
         </div>
       </div>
 
-      <div className="panel wide-panel">
+      <div className="panel compact-panel">
         <div className="section-head">
           <div>
             <h3>Имущество героя</h3>
@@ -241,12 +250,12 @@ export function HeroPage() {
         </div>
       </div>
 
-      <div className="panel wide-panel">
+      <div className="panel compact-panel">
         <h3>Квалификации</h3>
         <div className="chips">
           {activeSpecialties.map((track) => (
             <div key={track.track} className="chip">
-              <span>{track.track}</span>
+              <span>{trackLabels[track.track] ?? track.track}</span>
               <strong>
                 lvl {track.level} / {track.points} QP
               </strong>
@@ -255,7 +264,7 @@ export function HeroPage() {
         </div>
       </div>
 
-      <div className="panel">
+      <div className="panel compact-panel">
         <h3>Риски</h3>
         {risks.length === 0 ? (
           <p className="muted">
@@ -273,7 +282,7 @@ export function HeroPage() {
         )}
       </div>
 
-      <div className="panel">
+      <div className="panel compact-panel">
         <h3>Активные таймеры</h3>
         {activeTimers.length === 0 ? (
           <p className="muted">
@@ -282,7 +291,7 @@ export function HeroPage() {
         ) : (
           <div className="timer-list">
             {activeTimers.map((timer) => (
-              <article key={timer.key} className="timer-card">
+              <article key={timer.key} className="timer-card compact-card">
                 <strong>{timer.label}</strong>
                 <p>Старт: {timer.startedAt}</p>
                 <p>Окончание: {timer.endsAt}</p>
@@ -293,7 +302,7 @@ export function HeroPage() {
         )}
       </div>
 
-      <div className="panel wide-panel">
+      <div className="panel compact-panel">
         <h3>Журнал событий</h3>
         {game.logs.length === 0 ? (
           <p className="muted">
@@ -301,8 +310,8 @@ export function HeroPage() {
           </p>
         ) : (
           <div className="log-list">
-            {game.logs.slice(0, 8).map((entry) => (
-              <article key={entry.id} className="log-item">
+            {game.logs.slice(0, 4).map((entry) => (
+              <article key={entry.id} className="log-item compact-card">
                 <span className="log-kind">{entry.kind}</span>
                 <p>{entry.message}</p>
                 <time>{new Date(entry.at).toLocaleString("ru-RU")}</time>

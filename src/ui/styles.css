@@ -48,7 +48,7 @@ button {
 
 .app-shell {
   min-height: 100vh;
-  padding: 24px;
+  padding: 18px;
 }
 
 .topbar {
@@ -56,7 +56,7 @@ button {
   justify-content: space-between;
   gap: 24px;
   align-items: flex-start;
-  margin-bottom: 24px;
+  margin-bottom: 18px;
 }
 
 .topbar-controls {
@@ -101,9 +101,9 @@ button {
 .badge {
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.04);
-  padding: 8px 12px;
+  padding: 6px 10px;
   border-radius: 999px;
-  font-size: 0.9rem;
+  font-size: 0.82rem;
 }
 
 .gold-badge {
@@ -126,8 +126,8 @@ button {
 
 .app-body {
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr);
-  gap: 24px;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 18px;
 }
 
 .sidebar {
@@ -142,8 +142,8 @@ button {
 }
 
 .nav-card {
-  padding: 16px 18px;
-  border-radius: 18px;
+  padding: 12px 14px;
+  border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.06);
   background: rgba(255, 255, 255, 0.03);
   transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
@@ -159,22 +159,27 @@ button {
 .content,
 .page-grid {
   display: grid;
-  gap: 20px;
+  gap: 16px;
 }
 
 .page-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
 }
 
 .pc-grid {
   grid-template-columns: 1.1fr 1fr;
 }
 
+.dense-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .panel {
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
-  border-radius: 28px;
-  padding: 24px;
+  border-radius: 24px;
+  padding: 18px;
   box-shadow: var(--panel-shadow);
   backdrop-filter: blur(18px);
 }
@@ -184,20 +189,20 @@ button {
 }
 
 .hero-headline {
-  min-height: 240px;
+  min-height: 0;
 }
 
 .hero-metrics {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 14px;
-  margin-top: 22px;
+  gap: 10px;
+  margin-top: 16px;
 }
 
 .hero-metrics > div,
 .active-order-banner {
-  padding: 14px 16px;
-  border-radius: 18px;
+  padding: 12px 14px;
+  border-radius: 16px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.06);
 }
@@ -217,7 +222,7 @@ button {
 .log-list,
 .stat-list {
   display: grid;
-  gap: 14px;
+  gap: 10px;
 }
 
 .progress-row,
@@ -227,10 +232,18 @@ button {
 .shop-card,
 .order-card,
 .log-item {
-  padding: 14px 16px;
-  border-radius: 18px;
+  padding: 12px 14px;
+  border-radius: 16px;
   background: rgba(255, 255, 255, 0.035);
   border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.compact-card {
+  padding: 10px 12px;
+}
+
+.compact-copy {
+  margin: 6px 0 0;
 }
 
 .risk-card p,
@@ -259,7 +272,7 @@ button {
 .order-meta {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
   align-items: center;
 }
 
@@ -296,9 +309,10 @@ button {
 
 .learning-section-grid {
   display: grid;
-  gap: 18px;
+  gap: 14px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin-top: 18px;
+  margin-top: 14px;
+  align-items: start;
 }
 
 .learning-section {
@@ -318,9 +332,9 @@ button {
   width: min(360px, calc(100vw - 32px));
   max-height: calc(100vh - 48px);
   display: grid;
-  gap: 16px;
-  padding: 22px;
-  border-radius: 28px;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 22px;
   background: rgba(10, 15, 18, 0.94);
   border: 1px solid rgba(142, 202, 230, 0.18);
   box-shadow: 0 28px 80px rgba(0, 0, 0, 0.45);
@@ -372,8 +386,8 @@ button {
   width: min(560px, 100%);
   display: grid;
   gap: 16px;
-  padding: 24px;
-  border-radius: 28px;
+  padding: 20px;
+  border-radius: 24px;
   background: linear-gradient(180deg, rgba(20, 29, 33, 0.98), rgba(12, 18, 20, 0.98));
   border: 1px solid rgba(242, 170, 76, 0.24);
   box-shadow: 0 24px 90px rgba(0, 0, 0, 0.42);
@@ -387,7 +401,7 @@ button {
 
 .chip {
   min-width: 160px;
-  padding: 12px 14px;
+  padding: 10px 12px;
   border-radius: 16px;
   background: rgba(142, 202, 230, 0.08);
   border: 1px solid rgba(142, 202, 230, 0.18);
@@ -405,6 +419,22 @@ button {
 
 .compact-stats {
   grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+}
+
+.compact-book-stats .stat-item {
+  padding: 10px 12px;
+}
+
+.life-action-list {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.compact-panel {
+  align-content: start;
+}
+
+.compact-actions {
+  flex-wrap: wrap;
 }
 
 .primary-button,
@@ -445,10 +475,10 @@ button {
 
 .pc-figure {
   position: relative;
-  min-height: 290px;
-  margin: 22px 0 8px;
-  padding: 18px;
-  border-radius: 28px;
+  min-height: 220px;
+  margin: 14px 0 4px;
+  padding: 14px;
+  border-radius: 22px;
   background:
     radial-gradient(circle at center, rgba(142, 202, 230, 0.08), transparent 48%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01));
@@ -457,15 +487,15 @@ button {
 .monitor-shell {
   width: min(100%, 520px);
   margin: 0 auto;
-  border-radius: 22px;
-  padding: 16px;
+  border-radius: 18px;
+  padding: 12px;
   background: linear-gradient(160deg, #20282b, #0e1416);
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .monitor-screen {
-  min-height: 180px;
-  padding: 18px;
+  min-height: 132px;
+  padding: 14px;
   border-radius: 14px;
   background: linear-gradient(160deg, #101615, #0c1013);
   color: #7ff2a1;
@@ -473,7 +503,7 @@ button {
 }
 
 .monitor-screen p {
-  margin: 0 0 10px;
+  margin: 0 0 8px;
 }
 
 .pc-stand {
@@ -486,17 +516,52 @@ button {
 
 .pc-desk-line {
   height: 8px;
-  margin-top: 24px;
+  margin-top: 14px;
   border-radius: 999px;
   background: linear-gradient(90deg, rgba(242, 170, 76, 0.08), rgba(142, 202, 230, 0.2));
 }
 
 .empty-state {
-  padding: 24px;
+  padding: 18px;
   text-align: center;
   border-radius: 20px;
   border: 1px dashed rgba(255, 255, 255, 0.12);
   color: var(--text-muted);
+}
+
+.game-over-shell {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+}
+
+.game-over-panel {
+  width: min(1080px, 100%);
+  display: grid;
+  gap: 14px;
+}
+
+.game-over-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.game-over-summary {
+  padding: 16px 18px;
+}
+
+.game-over-actions {
+  display: flex;
+  justify-content: center;
+}
+
+.upgrade-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.upgrade-card {
+  align-content: start;
 }
 
 .log-item time {
@@ -507,8 +572,12 @@ button {
 @media (max-width: 1080px) {
   .app-body,
   .page-grid,
+  .dense-grid,
   .learning-section-grid,
-  .pc-grid {
+  .pc-grid,
+  .life-action-list,
+  .game-over-grid,
+  .upgrade-grid {
     grid-template-columns: 1fr;
   }
 

@@ -36,7 +36,7 @@ export function PcOrdersPage() {
 
   return (
     <section className="page-grid pc-grid">
-      <div className="panel pc-stage">
+      <div className="panel pc-stage wide-panel">
         <p className="eyebrow">ПК / Заказы</p>
         <h2>Рабочее место</h2>
         <div className="pc-figure">
@@ -94,7 +94,7 @@ export function PcOrdersPage() {
         ) : (
           <div className="order-list">
             {visibleOrders.map((order) => (
-              <article key={order.id} className="order-card">
+              <article key={order.id} className="order-card compact-card">
                 <div className="order-meta">
                   <span className="badge">lvl {order.level}</span>
                   {order.isGolden ? <span className="badge gold-badge">gold</span> : null}
@@ -148,26 +148,20 @@ export function PcOrdersPage() {
           </button>
         </div>
 
-        <div className="shop-list">
+        <div className="shop-list upgrade-grid">
           {nextPartsBySlot.map(({ slot, installed, installedPart, nextPart }) => (
-            <article key={slot} className="shop-card">
+            <article key={slot} className="shop-card compact-card upgrade-card">
               <div>
                 <p className="eyebrow">{formatSlotName(slot)}</p>
-                <h4>
-                  {installedPart?.funnyTitle ?? "Слот пуст"}
-                </h4>
-                <p className="muted">
-                  Текущий уровень: {installed?.level ?? 0}
-                  {" · "}
-                  Очки: {installed?.score ?? 0}
-                </p>
+                <h4>{installedPart?.funnyTitle ?? "Слот пуст"}</h4>
+                <p className="muted">LVL: {installed?.level ?? 0}</p>
               </div>
 
               {nextPart ? (
                 <>
-                  <p>{nextPart.funnyTitle}</p>
-                  <div className="shop-actions">
-                    <span>${nextPart.price}</span>
+                  <p className="muted compact-copy">{nextPart.funnyTitle}</p>
+                  <div className="shop-actions compact-actions">
+                    <span className="badge">${nextPart.price}</span>
                     <button
                       className="primary-button"
                       onClick={() => actions.buyAndInstallPcPart(nextPart.id)}
@@ -206,7 +200,7 @@ export function PcOrdersPage() {
               <strong>В работе: {activeOrder.title}</strong>
               <span>{activeOrder.funnyTitle}</span>
             </article>
-            <article className="timer-card">
+            <article className="timer-card compact-card">
               <p>Награда: ${activeOrder.rewardMoney}</p>
               <p>QP: +{activeOrder.rewardQualificationPoints}</p>
               <p>Риск провала: {activeOrder.failureChancePct}%</p>
