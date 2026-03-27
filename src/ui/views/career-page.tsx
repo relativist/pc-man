@@ -1,4 +1,5 @@
 import { getActivityProgress, useNow } from "../activity-progress";
+import { InfoHint } from "../info-hint";
 import { useGameStore } from "../store-hooks";
 
 const trackLabels: Record<string, string> = {
@@ -31,10 +32,10 @@ export function CareerPage() {
     <section className="page-grid dense-grid">
       <div className="panel hero-headline wide-panel">
         <p className="eyebrow">Карьера</p>
-        <h2>Работа и вакансии</h2>
-        <p className="lede">
-          Здесь герой ищет офферы, выбирает компанию и двигается по карьерной лестнице.
-        </p>
+        <div className="title-with-help">
+          <h2>Работа и вакансии</h2>
+          <InfoHint text="Здесь герой ищет офферы, выбирает компанию и двигается по карьерной лестнице." />
+        </div>
 
         <div className="hero-metrics">
           <div>
@@ -63,16 +64,14 @@ export function CareerPage() {
       <div className="panel compact-panel">
         <div className="section-head">
           <div>
-            <h3>Текущая должность</h3>
-            <p className="muted">Основная работа не теряется, но можно искать более выгодную компанию.</p>
+            <div className="title-with-help">
+              <h3>Текущая должность</h3>
+              <InfoHint text="Основная работа не теряется, но можно искать более выгодную компанию." />
+            </div>
           </div>
           <div className="badge-row">
-            <span className="badge">
-              {game.career.jobSearchInProgress ? "Поиск идет" : "Поиск не идет"}
-            </span>
-            <span className="badge">
-              {game.career.promotionAvailable ? "Можно просить повышение" : "Повышение не открыто"}
-            </span>
+            {game.career.jobSearchInProgress ? <span className="badge">Поиск идет</span> : null}
+            {game.career.promotionAvailable ? <span className="badge">Можно просить повышение</span> : null}
           </div>
         </div>
 
@@ -113,22 +112,22 @@ export function CareerPage() {
       <div className="panel compact-panel">
         <div className="section-head">
           <div>
-            <h3>Поиск работы</h3>
-            <p className="muted">
-              Поиск занимает 1-3 игровых дня и должен принести от 1 до 3 вакансий.
-            </p>
+            <div className="title-with-help">
+              <h3>Поиск работы</h3>
+              <InfoHint text="Поиск занимает 1-3 игровых дня и должен принести от 1 до 3 вакансий." />
+            </div>
           </div>
           <div className="badge-row">
             <button
-              className="secondary-button"
+              className="primary-button"
               onClick={() => actions.startJobSearch()}
               disabled={game.career.jobSearchInProgress}
             >
               Запустить поиск
             </button>
-            <span className="badge">
-              {game.career.jobSearchInProgress ? "Автозавершение включено" : "Ожидание старта"}
-            </span>
+            {game.career.jobSearchInProgress ? (
+              <span className="badge">Автозавершение включено</span>
+            ) : null}
           </div>
         </div>
 

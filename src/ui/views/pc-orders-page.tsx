@@ -1,13 +1,59 @@
-import { pcSlotCatalogSpec, requiredPcSlots } from "../../domain";
+import {
+  getOrderLevelByPcScore,
+  meetsOrderPcRequirements,
+  meetsOrderQualificationRequirements,
+  pcScoreRangesByOrderLevel,
+  pcSlotCatalogSpec,
+  requiredPcSlots,
+  type GameState,
+  type QualificationLevel,
+} from "../../domain";
+import { getActivityProgress, useNow } from "../activity-progress";
+import { formatUiPercent } from "../display-format";
+import { InfoHint } from "../info-hint";
 import { useGameStore } from "../store-hooks";
 
 function formatSlotName(slot: keyof typeof pcSlotCatalogSpec): string {
   return pcSlotCatalogSpec[slot].displayName;
 }
 
+function getOrderAvailabilityHint(game: GameState): string {
+  if (!game.pc.isWorkingPcReady) {
+    return "Заказы откроются после полной сборки рабочего ПК.";
+  }
+
+  const unresolvedOrders = game.world.orderPool.filter(
+    (order) =>
+      !game.orders.completedOrderIds.includes(order.id) &&
+      !game.orders.failedOrderIds.includes(order.id) &&
+      game.orders.activeOrderId !== order.id,
+  );
+  const qualificationReadyOrders = unresolvedOrders.filter((order) =>
+    meetsOrderQualificationRequirements(game, order),
+  );
+  const nextPcBlockedOrder = qualificationReadyOrders.find(
+    (order) => !meetsOrderPcRequirements(game, order),
+  );
+
+  if (unresolvedOrders.length === 0) {
+    return "В пуле больше не осталось новых заказов. Нужен новый контент или сброс прогресса.";
+  }
+
+  if (qualificationReadyOrders.length === 0) {
+    return "По квалификации заказы пока закрыты. Сначала подними нужный трек.";
+  }
+
+  if (nextPcBlockedOrder) {
+    return `Следующий заказ откроется от PC score ${nextPcBlockedOrder.requirements.minPcScore}.`;
+  }
+
+  return "Пул заказов можно обновлять вручную, чтобы попытаться получить новые варианты.";
+}
+
 export function PcOrdersPage() {
   const game = useGameStore((state) => state.game);
   const actions = useGameStore((state) => state.actions);
+  const now = useNow();
 
   const nextPartsBySlot = requiredPcSlots.map((slot) => {
     const installedLevel = game.pc.components[slot]?.level ?? 0;
@@ -33,6 +79,24 @@ export function PcOrdersPage() {
   const activeOrder = game.orders.activeOrderId
     ? game.world.orderPool.find((order) => order.id === game.orders.activeOrderId) ?? null
     : null;
+  const activeOrderProgress =
+    game.timers.activeOrder && activeOrder
+      ? getActivityProgress(game.timers.activeOrder, now)
+      : null;
+  const activeOrderLabel = activeOrder ? activeOrder.title : "Нет";
+  const currentOrderTier = getOrderLevelByPcScore(game.pc.ratingScore);
+  const nextOrderTier: QualificationLevel | null =
+    currentOrderTier === null
+      ? 1
+      : currentOrderTier < 5
+        ? (currentOrderTier + 1) as QualificationLevel
+        : null;
+  const nextOrderScore = nextOrderTier ? pcScoreRangesByOrderLevel[nextOrderTier].minScore : null;
+  const pcLevelHint =
+    game.pc.level > 0
+      ? `PC level считается по самому слабому компоненту. Чтобы поднять его до ${game.pc.level + 1}, все комплектующие должны быть минимум ${game.pc.level + 1} уровня.`
+      : "PC level появится после сборки полного рабочего ПК.";
+  const orderAvailabilityHint = getOrderAvailabilityHint(game);
 
   return (
     <section className="page-grid pc-grid">
@@ -43,9 +107,11 @@ export function PcOrdersPage() {
           <div className="monitor-shell">
             <div className="monitor-screen">
               <p>pc-man@workspace</p>
+              <p>pc_level: {game.pc.level}</p>
               <p>rating_score: {game.pc.ratingScore}</p>
               <p>working_pc_ready: {String(game.pc.isWorkingPcReady)}</p>
               <p>active_order: {game.orders.activeOrderId ?? "none"}</p>
+              <p>order_progress: {activeOrderProgress?.percent ?? 0}%</p>
             </div>
           </div>
           <div className="pc-stand" />
@@ -53,6 +119,10 @@ export function PcOrdersPage() {
         </div>
 
         <div className="hero-metrics">
+          <div>
+            <span className="metric-label">PC level</span>
+            <strong>{game.pc.level}</strong>
+          </div>
           <div>
             <span className="metric-label">Рейтинг ПК</span>
             <strong>{game.pc.ratingScore}</strong>
@@ -63,7 +133,7 @@ export function PcOrdersPage() {
           </div>
           <div>
             <span className="metric-label">Активный заказ</span>
-            <strong>{game.orders.activeOrderId ?? "Нет"}</strong>
+            <strong>{activeOrderLabel}</strong>
           </div>
         </div>
       </div>
@@ -71,12 +141,15 @@ export function PcOrdersPage() {
       <div className="panel">
         <div className="section-head">
           <div>
-            <h3>Доступные заказы</h3>
-            <p className="muted">
-              Пул ротируется раз в 10 минут. Одновременно можно вести только один заказ.
-            </p>
+            <div className="title-with-help">
+              <h3>Доступные заказы</h3>
+              <InfoHint text="Пул ротируется раз в 10 минут. Одновременно можно вести только один заказ." />
+            </div>
           </div>
           <div className="badge-row">
+            <button className="primary-button" onClick={() => actions.refreshOrders()}>
+              Обновить заказы
+            </button>
             <span className="badge">Видно: {visibleOrders.length}/10</span>
             <span className="badge">
               Следующее обновление: {game.orders.nextRefreshAt ? "запланировано" : "нет"}
@@ -84,12 +157,29 @@ export function PcOrdersPage() {
           </div>
         </div>
 
+        <div className="timer-card compact-card">
+          <div className="stat-list compact-stats">
+            <div className="stat-item">
+              <span>PC level</span>
+              <strong>{game.pc.level}</strong>
+            </div>
+            <div className="stat-item">
+              <span>Текущий tier заказов</span>
+              <strong>{currentOrderTier ? `lvl ${currentOrderTier}` : "Закрыт"}</strong>
+            </div>
+            <div className="stat-item">
+              <span>Следующий порог</span>
+              <strong>{nextOrderScore ? `${nextOrderScore} PC score` : "Максимум"}</strong>
+            </div>
+          </div>
+          <p className="muted">{pcLevelHint}</p>
+          <p className="muted">{orderAvailabilityHint}</p>
+        </div>
+
         {visibleOrders.length === 0 ? (
           <div className="empty-state">
             <h4>Пока нет доступных заказов</h4>
-            <p>
-              Собери рабочий ПК и подтяни квалификацию. После этого раздел начнет заполняться.
-            </p>
+            <p>{orderAvailabilityHint}</p>
           </div>
         ) : (
           <div className="order-list">
@@ -117,7 +207,7 @@ export function PcOrdersPage() {
                   </div>
                   <div className="stat-item">
                     <span>Риск</span>
-                    <strong>{order.failureChancePct}%</strong>
+                    <strong>{formatUiPercent(order.failureChancePct)}</strong>
                   </div>
                   <div className="stat-item">
                     <span>Мин. ПК</span>
@@ -140,12 +230,11 @@ export function PcOrdersPage() {
       <div className="panel">
         <div className="section-head">
           <div>
-            <h3>Сборка и апгрейды</h3>
-            <p className="muted">Покупка сразу ставит компонент в слот.</p>
+            <div className="title-with-help">
+              <h3>Сборка и апгрейды</h3>
+              <InfoHint text="Покупка сразу ставит компонент в слот." />
+            </div>
           </div>
-          <button className="secondary-button" onClick={() => actions.refreshOrders()}>
-            Обновить заказы
-          </button>
         </div>
 
         <div className="shop-list upgrade-grid">
@@ -182,31 +271,44 @@ export function PcOrdersPage() {
       <div className="panel">
         <div className="section-head">
           <div>
-            <h3>Активный заказ</h3>
-            <p className="muted">Для MVP здесь доступно ручное завершение активной работы.</p>
+            <div className="title-with-help">
+              <h3>Активный заказ</h3>
+              <InfoHint text="Активный заказ идет по таймеру и завершится автоматически." />
+            </div>
           </div>
-          <button
-            className="secondary-button"
-            onClick={() => actions.resolveActiveOrder()}
-            disabled={!game.orders.activeOrderId}
-          >
-            Завершить активный заказ
-          </button>
         </div>
 
-        {activeOrder ? (
+        {activeOrder && activeOrderProgress ? (
           <div className="risk-list">
             <article className="active-order-banner">
               <strong>В работе: {activeOrder.title}</strong>
               <span>{activeOrder.funnyTitle}</span>
             </article>
             <article className="timer-card compact-card">
-              <p>Награда: ${activeOrder.rewardMoney}</p>
-              <p>QP: +{activeOrder.rewardQualificationPoints}</p>
-              <p>Риск провала: {activeOrder.failureChancePct}%</p>
-              <p>
-                Таймер: {game.timers.activeOrder?.startedAt ?? "не запущен"} →{" "}
-                {game.timers.activeOrder?.endsAt ?? "не запущен"}
+              <div className="stat-list compact-stats">
+                <div className="stat-item">
+                  <span>Награда</span>
+                  <strong>${activeOrder.rewardMoney}</strong>
+                </div>
+                <div className="stat-item">
+                  <span>QP</span>
+                  <strong>+{activeOrder.rewardQualificationPoints}</strong>
+                </div>
+                <div className="stat-item">
+                  <span>Риск провала</span>
+                  <strong>{formatUiPercent(activeOrder.failureChancePct)}</strong>
+                </div>
+              </div>
+              <div className="progress-bar">
+                <div
+                  className="progress-fill progress-mid"
+                  style={{ width: `${activeOrderProgress.percent}%` }}
+                />
+              </div>
+              <p>Прогресс: {formatUiPercent(activeOrderProgress.percent)}</p>
+              <p className="muted">
+                Осталось примерно {activeOrderProgress.remainingLabel}. Заказ завершится
+                автоматически.
               </p>
             </article>
           </div>

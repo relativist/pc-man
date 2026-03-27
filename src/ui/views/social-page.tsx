@@ -1,10 +1,12 @@
 import { maxFriends, maxPets, spouseGiftPrice } from "../../domain";
 import { getActivityProgress, useNow } from "../activity-progress";
+import { roundUiValue } from "../display-format";
+import { InfoHint } from "../info-hint";
 import { useGameStore } from "../store-hooks";
 
 function getPetAgeYears(acquiredAt: string): number {
   const elapsedMinutes = Math.max(0, Date.now() - new Date(acquiredAt).getTime()) / 60_000;
-  return Number((elapsedMinutes / 10).toFixed(1));
+  return roundUiValue(elapsedMinutes / 10);
 }
 
 export function SocialPage() {
@@ -23,10 +25,10 @@ export function SocialPage() {
     <section className="page-grid dense-grid">
       <div className="panel hero-headline wide-panel">
         <p className="eyebrow">Хобби / Социальная жизнь</p>
-        <h2>Прогулки, знакомства и семейная ветка</h2>
-        <p className="lede">
-          Здесь герой уходит в приключения, находит друзей, может встретить супругу и заводит питомцев.
-        </p>
+        <div className="title-with-help">
+          <h2>Прогулки, знакомства и семейная ветка</h2>
+          <InfoHint text="Здесь герой уходит в приключения, находит друзей, может встретить супругу и заводит питомцев." />
+        </div>
 
         <div className="hero-metrics">
           <div>
@@ -59,22 +61,20 @@ export function SocialPage() {
       <div className="panel compact-panel">
         <div className="section-head">
           <div>
-            <h3>Прогулка</h3>
-            <p className="muted">
-              Один выход может принести здоровье, деньги, приключение или небольшой урон кошельку.
-            </p>
+            <div className="title-with-help">
+              <h3>Прогулка</h3>
+              <InfoHint text="Один выход может принести здоровье, деньги, приключение или небольшой урон кошельку." />
+            </div>
           </div>
           <div className="badge-row">
             <button
-              className="secondary-button"
+              className="primary-button"
               onClick={() => actions.startWalk()}
               disabled={Boolean(game.timers.walk)}
             >
               Начать прогулку
             </button>
-            <span className="badge">
-              {game.timers.walk ? "Автозавершение включено" : "Можно запускать"}
-            </span>
+            {game.timers.walk ? <span className="badge">Автозавершение включено</span> : null}
           </div>
         </div>
 
@@ -112,10 +112,10 @@ export function SocialPage() {
       <div className="panel compact-panel">
         <div className="section-head">
           <div>
-            <h3>Друзья</h3>
-            <p className="muted">
-              Чем чаще гуляешь, тем больше знакомых находишь. Каждый друг в будущем сможет дать до 3 заказов.
-            </p>
+            <div className="title-with-help">
+              <h3>Друзья</h3>
+              <InfoHint text="Чем чаще гуляешь, тем больше знакомых находишь. Каждый друг в будущем сможет дать до 3 заказов." />
+            </div>
           </div>
           <span className="badge">{activeFriends.length} активных</span>
         </div>
@@ -155,11 +155,10 @@ export function SocialPage() {
       <div className="panel compact-panel">
         <div className="section-head">
           <div>
-            <h3>Семья</h3>
-            <p className="muted">
-              Семья должна давать бонус к обучению и доходу, но увеличивать расходы. В MVP здесь закрепляем базовый
-              flow.
-            </p>
+            <div className="title-with-help">
+              <h3>Семья</h3>
+              <InfoHint text="Семья должна давать бонус к обучению и доходу, но увеличивать расходы. В MVP здесь закрепляем базовый flow." />
+            </div>
           </div>
           <span className="badge">{game.social.childrenCount} детей</span>
         </div>
@@ -177,7 +176,7 @@ export function SocialPage() {
 
             <div className="badge-row">
               <button
-                className="secondary-button"
+                className="primary-button"
                 onClick={() => actions.giveSpouseGift()}
                 disabled={game.player.money < spouseGiftPrice}
               >
@@ -214,10 +213,10 @@ export function SocialPage() {
       <div className="panel compact-panel">
         <div className="section-head">
           <div>
-            <h3>Питомцы</h3>
-            <p className="muted">
-              Питомцев может быть несколько. В среднем они живут 2-3 игровых года и иногда уходят случайно.
-            </p>
+            <div className="title-with-help">
+              <h3>Питомцы</h3>
+              <InfoHint text="Питомцев может быть несколько. В среднем они живут 2-3 игровых года и иногда уходят случайно." />
+            </div>
           </div>
           <span className="badge">{livingPets.length} живы</span>
         </div>

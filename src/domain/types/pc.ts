@@ -10,6 +10,7 @@ export type InstalledComponent = {
 
 export type PcState = {
   isWorkingPcReady: boolean;
+  level: number;
   ratingScore: number;
   components: Record<PcComponentSlot, InstalledComponent | null>;
 };
@@ -22,4 +23,3 @@ export type PcComponentCatalogItem = {
   score: number;
   price: number;
 };
-

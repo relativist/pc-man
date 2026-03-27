@@ -185,6 +185,7 @@ function createInitialPcState(): GameState["pc"] {
 
   return {
     isWorkingPcReady: false,
+    level: 0,
     ratingScore: 0,
     components,
   };

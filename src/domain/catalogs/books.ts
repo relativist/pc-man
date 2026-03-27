@@ -1,6 +1,8 @@
 import type { Book } from "../types";
 
-export const books: Book[] = [
+const bookPriceMultiplier = 10;
+
+const baseBooks: Book[] = [
   {
     id: "universal-computer-on",
     track: "universal",
@@ -729,3 +731,8 @@ export const books: Book[] = [
     },
   },
 ];
+
+export const books: Book[] = baseBooks.map((book) => ({
+  ...book,
+  price: book.price * bookPriceMultiplier,
+}));

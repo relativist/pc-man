@@ -1,4 +1,11 @@
 import { getActivityProgress, useNow } from "../activity-progress";
+import {
+  formatUiAgeYears,
+  formatUiPercent,
+  formatUiWeight,
+  roundUiValue,
+} from "../display-format";
+import { InfoHint } from "../info-hint";
 import { useGameStore } from "../store-hooks";
 
 function getHealthStatus(value: number): string {
@@ -32,19 +39,19 @@ export function LifePage() {
     <section className="page-grid">
       <div className="panel hero-headline">
         <p className="eyebrow">Быт и Здоровье</p>
-        <h2>Тело, режим и лечение</h2>
-        <p className="lede">
-          Здесь герой ест, тренируется, следит за весом и запускает дорогое лечение с омоложением.
-        </p>
+        <div className="title-with-help">
+          <h2>Тело, режим и лечение</h2>
+          <InfoHint text="Здесь герой ест, тренируется, следит за весом и запускает дорогое лечение с омоложением." />
+        </div>
 
         <div className="hero-metrics">
           <div>
             <span className="metric-label">Возраст</span>
-            <strong>{game.player.ageYears} лет</strong>
+            <strong>{formatUiAgeYears(game.player.ageYears)}</strong>
           </div>
           <div>
             <span className="metric-label">Вес</span>
-            <strong>{game.player.weight} кг</strong>
+            <strong>{formatUiWeight(game.player.weight)}</strong>
           </div>
           <div>
             <span className="metric-label">Статус здоровья</span>
@@ -64,7 +71,7 @@ export function LifePage() {
             <div key={metric.label} className="progress-row">
               <div className="progress-label">
                 <span>{metric.label}</span>
-                <span>{metric.value}%</span>
+                <span>{formatUiPercent(metric.value)}</span>
               </div>
               <div className="progress-bar">
                 <div
@@ -86,8 +93,10 @@ export function LifePage() {
       <div className="panel">
         <div className="section-head">
           <div>
-            <h3>Повседневные действия</h3>
-            <p className="muted">Минимальный слой быта для MVP.</p>
+            <div className="title-with-help">
+              <h3>Повседневные действия</h3>
+              <InfoHint text="Минимальный слой быта для MVP." />
+            </div>
           </div>
         </div>
         <div className="order-list life-action-list">
@@ -134,27 +143,29 @@ export function LifePage() {
           <article className={`risk-card ${game.player.hunger >= 70 ? "risk-high" : "risk-low"}`}>
             <strong>Голод</strong>
             <p>
-              Текущий уровень голода: {game.player.hunger}%. При критических значениях герой может
-              умереть.
+              Текущий уровень голода: {formatUiPercent(game.player.hunger)}. При критических
+              значениях герой может умереть.
             </p>
           </article>
           <article className={`risk-card ${game.player.health <= 45 ? "risk-high" : "risk-low"}`}>
             <strong>Здоровье</strong>
             <p>
-              Текущее здоровье: {game.player.health}%. Плохое здоровье усиливает риски старения.
+              Текущее здоровье: {formatUiPercent(game.player.health)}. Плохое здоровье усиливает
+              риски старения.
             </p>
           </article>
           <article className={`risk-card ${game.player.weight >= 110 ? "risk-mid" : "risk-low"}`}>
             <strong>Вес</strong>
             <p>
-              Текущий вес: {game.player.weight} кг. Избыточный вес должен ухудшать жизненные
-              показатели.
+              Текущий вес: {formatUiWeight(game.player.weight)}. Избыточный вес должен ухудшать
+              жизненные показатели.
             </p>
           </article>
           <article className={`risk-card ${game.player.ageYears >= 60 ? "risk-mid" : "risk-low"}`}>
             <strong>Старение</strong>
             <p>
-              Возраст героя: {game.player.ageYears}. После 60 лет старение должно ощущаться сильнее.
+              Возраст героя: {roundUiValue(game.player.ageYears)}. После 60 лет старение должно
+              ощущаться сильнее.
             </p>
           </article>
         </div>
@@ -171,7 +182,7 @@ export function LifePage() {
                 style={{ width: `${healingProgress.percent}%` }}
               />
             </div>
-            <p>Прогресс: {healingProgress.percent}%</p>
+            <p>Прогресс: {formatUiPercent(healingProgress.percent)}</p>
             <p className="muted">
               Осталось примерно {healingProgress.remainingLabel}. Лечение завершится автоматически.
             </p>

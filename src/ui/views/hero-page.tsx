@@ -1,4 +1,10 @@
 import type { GameState } from "../../domain";
+import {
+  formatUiAgeYears,
+  formatUiPercent,
+  formatUiWeight,
+} from "../display-format";
+import { InfoHint } from "../info-hint";
 import { useGameStore } from "../store-hooks";
 
 const timerLabels = {
@@ -75,8 +81,8 @@ export function HeroPage() {
   ];
 
   const heroProfile = [
-    { label: "Возраст", value: `${game.player.ageYears} лет` },
-    { label: "Вес", value: `${Math.round(game.player.weight)} кг` },
+    { label: "Возраст", value: formatUiAgeYears(game.player.ageYears) },
+    { label: "Вес", value: formatUiWeight(game.player.weight) },
     { label: "Образование", value: game.player.education },
     { label: "Жилье", value: housingLabels[game.player.housingStatus] },
     {
@@ -166,11 +172,10 @@ export function HeroPage() {
     <section className="page-grid dense-grid">
       <div className="panel hero-headline wide-panel">
         <p className="eyebrow">Главная / Герой</p>
-        <h2>{game.player.name}</h2>
-        <p className="lede">
-          Герой строит карьеру, собирает активы и постепенно меняет уровень жизни от стартового
-          быта к более солидной версии себя.
-        </p>
+        <div className="title-with-help">
+          <h2>{game.player.name}</h2>
+          <InfoHint text="Герой строит карьеру, собирает активы и постепенно меняет уровень жизни от стартового быта к более солидной версии себя." />
+        </div>
 
         <div className="hero-metrics">
           <div>
@@ -199,7 +204,7 @@ export function HeroPage() {
             <div key={indicator.label} className="progress-row">
               <div className="progress-label">
                 <span>{indicator.label}</span>
-                <span>{indicator.value}%</span>
+                <span>{formatUiPercent(indicator.value)}</span>
               </div>
               <div className="progress-bar">
                 <div
@@ -227,10 +232,10 @@ export function HeroPage() {
       <div className="panel compact-panel">
         <div className="section-head">
           <div>
-            <h3>Имущество героя</h3>
-            <p className="muted">
-              Здесь видны актуальные крупные покупки из магазина: дом, транспорт и заметная вещь.
-            </p>
+            <div className="title-with-help">
+              <h3>Имущество героя</h3>
+              <InfoHint text="Здесь видны актуальные крупные покупки из магазина: дом, транспорт и заметная вещь." />
+            </div>
           </div>
           <span className="badge">${propertyValue}</span>
         </div>

@@ -1,4 +1,4 @@
-import { shopCatalogs } from "../catalogs";
+import { books as currentBookCatalog, shopCatalogs } from "../catalogs";
 import { ratedPcSlots, requiredPcSlots } from "../catalogs/pc-parts";
 import type {
   Book,
@@ -68,6 +68,13 @@ export function calculatePcRatingScore(components: GameState["pc"]["components"]
   return ratedPcSlots.reduce((total, slot) => total + (components[slot]?.score ?? 0), 0);
 }
 
+export function calculatePcLevel(components: GameState["pc"]["components"]): number {
+  return requiredPcSlots.reduce((lowestLevel, slot) => {
+    const componentLevel = components[slot]?.level ?? 0;
+    return Math.min(lowestLevel, componentLevel);
+  }, Number.POSITIVE_INFINITY);
+}
+
 export function isWorkingPcReady(components: GameState["pc"]["components"]): boolean {
   return requiredPcSlots.every((slot) => components[slot] !== null);
 }
@@ -95,6 +102,7 @@ export function normalizeGameState(gameState: GameState): GameState {
     shop: normalizedShop,
     world: {
       ...gameState.world,
+      availableBooks: [...currentBookCatalog],
       shopCatalogs: gameState.world.shopCatalogs ?? shopCatalogs,
     },
   };
@@ -142,6 +150,7 @@ export function normalizeGameState(gameState: GameState): GameState {
     pc: {
       ...shopGameState.pc,
       isWorkingPcReady: isWorkingPcReady(shopGameState.pc.components),
+      level: calculatePcLevel(shopGameState.pc.components),
       ratingScore: calculatePcRatingScore(shopGameState.pc.components),
     },
   };

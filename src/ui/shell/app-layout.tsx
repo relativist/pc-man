@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 
 import type { PendingSocialEncounter } from "../../domain";
+import { formatUiAgeYears } from "../display-format";
 import { useGameStore } from "../store-hooks";
 
 const navItems = [
@@ -156,7 +157,7 @@ export function AppLayout() {
             </div>
             <div>
               <span className="metric-label">Возраст</span>
-              <strong>{player.ageYears} лет</strong>
+              <strong>{formatUiAgeYears(player.ageYears)}</strong>
             </div>
             <div>
               <span className="metric-label">Деньги</span>
@@ -252,7 +253,7 @@ export function AppLayout() {
           <div className="topbar-stats">
             <span>{player.name}</span>
             <span>${player.money}</span>
-            <span>{player.ageYears} лет</span>
+            <span>{formatUiAgeYears(player.ageYears)}</span>
             <span>{career.currentJobId ? "Работает" : "Без работы"}</span>
             <span>{pc.ratingScore} PC score</span>
             <span>{orders.activeOrderId ? "Есть активный заказ" : "Заказ свободен"}</span>
@@ -306,7 +307,7 @@ export function AppLayout() {
             <h3>Глобальная лента событий</h3>
           </div>
           <button
-            className="secondary-button"
+            className="primary-button"
             onClick={() => {
               notificationAutoOpenedRef.current = false;
               setNotificationDrawerOpen(false);
@@ -360,7 +361,7 @@ export function AppLayout() {
 
             <div className="modal-actions">
               <button
-                className="secondary-button"
+                className="primary-button"
                 onClick={() => actions.rejectPendingSocialEncounter(pendingEncounter.id)}
               >
                 Отклонить

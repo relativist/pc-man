@@ -15,6 +15,8 @@ import {
   giveSpouseGift,
   installPcPart,
   normalizeGameState,
+  meetsOrderPcRequirements,
+  meetsOrderQualificationRequirements,
   refreshAvailableOrders,
   rejectPendingSocialEncounter,
   resolveActiveOrder,
@@ -117,6 +119,62 @@ function getEncounterRejectedLog(
   };
 }
 
+function isOrderResolved(gameState: GameState, orderId: string): boolean {
+  return (
+    gameState.orders.completedOrderIds.includes(orderId) ||
+    gameState.orders.failedOrderIds.includes(orderId)
+  );
+}
+
+function getOrderRefreshMessage(previousGame: GameState, nextGame: GameState): string {
+  const previousVisibleIds = new Set(previousGame.orders.availableOrderIds);
+  const addedOrders = nextGame.orders.availableOrderIds.filter((id) => !previousVisibleIds.has(id));
+
+  if (addedOrders.length > 0) {
+    return `Добавлены новые заказы: ${addedOrders.length}.`;
+  }
+
+  if (nextGame.orders.availableOrderIds.length > 0) {
+    return "Пул заказов обновлен. Новых заказов не появилось.";
+  }
+
+  if (!nextGame.pc.isWorkingPcReady) {
+    return "Новых заказов нет: сначала собери рабочий ПК.";
+  }
+
+  const unresolvedOrders = nextGame.world.orderPool.filter(
+    (order) => !isOrderResolved(nextGame, order.id) && nextGame.orders.activeOrderId !== order.id,
+  );
+  const qualificationReadyOrders = unresolvedOrders.filter((order) =>
+    meetsOrderQualificationRequirements(nextGame, order),
+  );
+  const qualificationBlocked = unresolvedOrders.length > qualificationReadyOrders.length;
+  const pcBlocked = qualificationReadyOrders.some((order) => !meetsOrderPcRequirements(nextGame, order));
+
+  if (qualificationBlocked && pcBlocked) {
+    return "Новых заказов нет: не хватает квалификации и мощности ПК.";
+  }
+
+  if (pcBlocked) {
+    return `Новых заказов нет: нужен более высокий PC score. Сейчас ${nextGame.pc.ratingScore}.`;
+  }
+
+  if (qualificationBlocked) {
+    return "Новых заказов нет: не хватает квалификации.";
+  }
+
+  return "Пул заказов обновлен. Новых заказов не появилось.";
+}
+
+function createOrderRefreshLog(message: string, at: Date): EventLogEntry {
+  return {
+    id: createLogEntryId("order_refresh", at),
+    at: at.toISOString(),
+    kind: "order_refresh",
+    message,
+  };
+}
+
 function settleGame(gameState: GameState, now: Date): GameState {
   return advanceGameState(gameState, now);
 }
@@ -198,9 +256,21 @@ export function createGameStore(options?: CreateNewGameOptions) {
         }));
       },
       refreshOrders: (now = new Date()) => {
-        set((state) => ({
-          game: touchGameMeta(refreshAvailableOrders(settleGame(state.game, now), now), now),
-        }));
+        set((state) => {
+          const settledGame = settleGame(state.game, now);
+          const nextGame = refreshAvailableOrders(settledGame, now);
+          const message = getOrderRefreshMessage(settledGame, nextGame);
+
+          return {
+            game: touchGameMeta(
+              {
+                ...nextGame,
+                logs: [createOrderRefreshLog(message, now), ...nextGame.logs],
+              },
+              now,
+            ),
+          };
+        });
       },
       startOrder: (orderId, now = new Date()) => {
         set((state) => ({
@@ -376,27 +446,9 @@ export function createGameStore(options?: CreateNewGameOptions) {
       eatMeal: () => {
         const now = new Date();
 
-        set((state) => {
-          const settledGame = settleGame(state.game, now);
-
-          return {
-            game: touchGameMeta(
-              {
-                ...eatMeal(settledGame),
-                logs: [
-                  {
-                    id: createLogEntryId("salary_paid", now),
-                    at: now.toISOString(),
-                    kind: "salary_paid",
-                    message: "Герой поел и восстановил часть сил.",
-                  },
-                  ...settledGame.logs,
-                ],
-              },
-              now,
-            ),
-          };
-        });
+        set((state) => ({
+          game: touchGameMeta(eatMeal(settleGame(state.game, now)), now),
+        }));
       },
       doWorkout: () => {
         const now = new Date();

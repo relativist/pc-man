@@ -1,4 +1,6 @@
 import { getActivityProgress, useNow } from "../activity-progress";
+import { formatUiPercent } from "../display-format";
+import { InfoHint } from "../info-hint";
 import { useGameStore } from "../store-hooks";
 
 const trackTitles: Record<string, string> = {
@@ -68,7 +70,9 @@ export function LearningPage() {
 
   const activeEntry = catalog.find((entry) => entry.isReading) ?? null;
   const activeBook = activeEntry?.book ?? null;
-  const queuedOwnedEntries = catalog.filter((entry) => entry.isOwned && !entry.isCompleted && !entry.isReading);
+  const queuedOwnedEntries = catalog.filter(
+    (entry) => entry.isOwned && !entry.isCompleted && !entry.isReading,
+  );
   const blockingEntry = activeEntry ?? queuedOwnedEntries[0] ?? null;
   const queuedBook = queuedOwnedEntries[0]?.book ?? null;
   const learningProgress = game.timers.learning
@@ -115,7 +119,6 @@ export function LearningPage() {
     entry: CatalogEntry,
     options?: {
       actionLabel: string;
-      actionKind: "primary" | "secondary";
       actionDisabled?: boolean;
       actionHint?: string;
       onAction: () => void;
@@ -152,7 +155,7 @@ export function LearningPage() {
 
         <div className="stat-list compact-stats compact-book-stats">
           <div className="stat-item">
-            <span>$</span>
+            <span>Цена</span>
             <strong>${entry.book.price}</strong>
           </div>
           <div className="stat-item">
@@ -172,7 +175,7 @@ export function LearningPage() {
         {options ? (
           <div className="shop-actions">
             <button
-              className={options.actionKind === "primary" ? "primary-button" : "secondary-button"}
+              className="primary-button"
               onClick={options.onAction}
               disabled={options.actionDisabled}
             >
@@ -189,11 +192,10 @@ export function LearningPage() {
     <section className="page-grid">
       <div className="panel hero-headline">
         <p className="eyebrow">Обучение</p>
-        <h2>Книги и рост квалификации</h2>
-        <p className="lede">
-          Покупка книги сразу запускает чтение. Пока текущая книга не завершена, следующую купить
-          нельзя.
-        </p>
+        <div className="title-with-help">
+          <h2>Книги и рост квалификации</h2>
+          <InfoHint text="Покупка книги сразу запускает чтение. Пока текущая книга не завершена, следующую купить нельзя." />
+        </div>
 
         <div className="hero-metrics">
           <div>
@@ -218,8 +220,10 @@ export function LearningPage() {
       <div className="panel">
         <div className="section-head">
           <div>
-            <h3>Текущее чтение</h3>
-            <p className="muted">В библиотеке всегда только одна незавершенная книга.</p>
+            <div className="title-with-help">
+              <h3>Текущее чтение</h3>
+              <InfoHint text="В библиотеке всегда только одна незавершенная книга." />
+            </div>
           </div>
           <span className="badge">{activeBook ? "Авточтение" : "Свободно"}</span>
         </div>
@@ -236,7 +240,7 @@ export function LearningPage() {
                 style={{ width: `${learningProgress.percent}%` }}
               />
             </div>
-            <p>Прогресс: {learningProgress.percent}%</p>
+            <p>Прогресс: {formatUiPercent(learningProgress.percent)}</p>
             <p className="muted">
               Осталось примерно {learningProgress.remainingLabel}. Книга завершится автоматически.
             </p>
@@ -282,85 +286,58 @@ export function LearningPage() {
       <div className="panel wide-panel">
         <div className="section-head">
           <div>
-            <h3>Книги по трекам</h3>
-            <p className="muted">
-              В каждом направлении показывается только ближайшая доступная книга. Закрытые книги не
-              выводятся.
-            </p>
+            <div className="title-with-help">
+              <h3>Книги по трекам</h3>
+              <InfoHint text="В каждом направлении показывается только ближайшая доступная книга. Закрытые книги не выводятся." />
+            </div>
           </div>
           <span className="badge">{availableTrackEntries.length} на экране</span>
         </div>
 
-        <div className="learning-section-grid">
-          <section className="learning-section">
-            <h4>Доступно</h4>
-            <p className="muted">
-              {blockingEntry
-                ? "Покупка новых книг заблокирована, пока не завершена текущая."
-                : "Книги идут по возрастанию уровня внутри каждого трека."}
-            </p>
+        <p className="muted">
+          {blockingEntry
+            ? "Покупка новых книг заблокирована, пока не завершена текущая."
+            : "Книги идут по возрастанию уровня внутри каждого трека."}
+        </p>
 
-            {availableTrackEntries.length > 0 ? (
-              <div className="order-list">
-                {availableTrackEntries.map((entry) =>
-                  renderBookCard(entry, {
-                    actionLabel: "Купить и читать",
-                    actionKind: "primary",
-                    actionDisabled: Boolean(blockingEntry) || game.player.money < entry.book.price,
-                    actionHint: blockingEntry
-                      ? `Сначала заверши: ${blockingEntry.book.title}`
-                      : game.player.money < entry.book.price
-                        ? "Не хватает денег"
-                        : undefined,
-                    onAction: () => actions.buyBook(entry.book.id),
-                  }),
-                )}
-              </div>
-            ) : (
-              <p className="muted">Сейчас нет новых книг, которые можно купить прямо сейчас.</p>
+        {availableTrackEntries.length > 0 ? (
+          <div className="book-grid">
+            {availableTrackEntries.map((entry) =>
+              renderBookCard(entry, {
+                actionLabel: "Купить и читать",
+                actionDisabled: Boolean(blockingEntry) || game.player.money < entry.book.price,
+                actionHint: blockingEntry
+                  ? `Сначала заверши: ${blockingEntry.book.title}`
+                  : game.player.money < entry.book.price
+                    ? "Не хватает денег"
+                    : undefined,
+                onAction: () => actions.buyBook(entry.book.id),
+              }),
             )}
-          </section>
+          </div>
+        ) : (
+          <p className="muted">Сейчас нет новых книг, которые можно купить прямо сейчас.</p>
+        )}
+      </div>
 
-          <section className="learning-section">
-            <h4>Куплены, но не завершены</h4>
-            <p className="muted">
-              Здесь лежит текущая книга и редкие старые покупки из сохранений до нового flow.
-            </p>
-
-            {activeEntry || queuedOwnedEntries.length > 0 ? (
-              <div className="order-list">
-                {activeEntry ? renderBookCard(activeEntry) : null}
-                {queuedOwnedEntries.map((entry) =>
-                  renderBookCard(entry, {
-                    actionLabel: "Начать читать",
-                    actionKind: "secondary",
-                    onAction: () => actions.startReadingBook(entry.book.id),
-                  }),
-                )}
-              </div>
-            ) : (
-              <p className="muted">Незавершенных книг нет.</p>
-            )}
-          </section>
-
-          <section className="learning-section">
-            <h4>Архив</h4>
-            <p className="muted">Вместо длинного списка здесь только короткая сводка по прочитанному.</p>
-
-            {completedCountByTrack.length > 0 ? (
-              <div className="chips">
-                {completedCountByTrack.map((item) => (
-                  <div key={item.track} className="chip">
-                    <span>{trackTitles[item.track] ?? item.track}</span>
-                    <strong>{item.count} проч.</strong>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="muted">Пока нет завершенных книг.</p>
-            )}
-          </section>
+      <div className="panel wide-panel">
+        <div className="title-with-help">
+          <h3>Архив</h3>
+          <InfoHint text="Вместо длинного списка здесь только короткая сводка по прочитанному." />
         </div>
+
+        {completedCountByTrack.length > 0 ? (
+          <div className="chips">
+            {completedCountByTrack.map((item) => (
+              <div key={item.track} className="chip">
+                <span>{trackTitles[item.track] ?? item.track}</span>
+                <strong>{item.count} проч.</strong>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="muted">Пока нет завершенных книг.</p>
+        )}
       </div>
     </section>
   );

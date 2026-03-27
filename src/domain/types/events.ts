@@ -9,6 +9,7 @@ export type EventLogKind =
   | "job_changed"
   | "book_completed"
   | "shop_purchase"
+  | "order_refresh"
   | "order_completed"
   | "order_failed"
   | "walk_completed"
