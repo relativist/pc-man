@@ -1,0 +1,9 @@
+services:
+  pc-man:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pc-man
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-4173}:80"

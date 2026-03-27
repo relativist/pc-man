@@ -3,3 +3,4 @@ dist
 .DS_Store
 .beads/
 .beads/export_hashes.json
+.idea
