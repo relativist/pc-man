@@ -13,13 +13,6 @@ export function convertGameDaysToMinutes(durationDays: number): number {
   return durationDays / gameDaysPerMonth;
 }
 
-export function isOrderAlreadyResolved(gameState: GameState, orderId: string): boolean {
-  return (
-    gameState.orders.completedOrderIds.includes(orderId) ||
-    gameState.orders.failedOrderIds.includes(orderId)
-  );
-}
-
 export function hasFriendOrderMarketAccess(gameState: GameState): boolean {
   return gameState.social.friends.length > 0;
 }
@@ -68,10 +61,6 @@ export function canOrderBeTaken(gameState: GameState, order: Order): boolean {
     return false;
   }
 
-  if (isOrderAlreadyResolved(gameState, order.id)) {
-    return false;
-  }
-
   return (
     meetsOrderQualificationRequirements(gameState, order) &&
     meetsOrderPcRequirements(gameState, order)
@@ -79,10 +68,6 @@ export function canOrderBeTaken(gameState: GameState, order: Order): boolean {
 }
 
 export function isOrderVisibleToPlayer(gameState: GameState, order: Order): boolean {
-  if (isOrderAlreadyResolved(gameState, order.id)) {
-    return false;
-  }
-
   if (gameState.orders.activeOrderId === order.id) {
     return false;
   }

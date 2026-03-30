@@ -59,6 +59,11 @@ button {
   margin-bottom: 18px;
 }
 
+.topbar-brand {
+  display: grid;
+  gap: 6px;
+}
+
 .topbar-controls {
   display: grid;
   gap: 12px;
@@ -83,6 +88,22 @@ button {
   text-transform: uppercase;
   letter-spacing: 0.18em;
   font-size: 0.72rem;
+}
+
+.topbar-meta {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.topbar-meta span {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 4px 8px;
+  border-radius: 999px;
 }
 
 .lede,

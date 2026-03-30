@@ -36,22 +36,13 @@ function getOrderAvailabilityHint(game: GameState): string {
     return "Заказы откроются после покупки первого ПК.";
   }
 
-  const unresolvedOrders = game.world.orderPool.filter(
-    (order) =>
-      !game.orders.completedOrderIds.includes(order.id) &&
-      !game.orders.failedOrderIds.includes(order.id) &&
-      game.orders.activeOrderId !== order.id,
-  );
-  const qualificationReadyOrders = unresolvedOrders.filter((order) =>
+  const inactiveOrders = game.world.orderPool.filter((order) => game.orders.activeOrderId !== order.id);
+  const qualificationReadyOrders = inactiveOrders.filter((order) =>
     meetsOrderQualificationRequirements(game, order),
   );
   const nextPcBlockedOrder = qualificationReadyOrders.find(
     (order) => !meetsOrderPcRequirements(game, order),
   );
-
-  if (unresolvedOrders.length === 0) {
-    return "В пуле больше не осталось новых заказов. Нужен новый контент или сброс прогресса.";
-  }
 
   if (qualificationReadyOrders.length === 0) {
     return "По квалификации заказы пока закрыты. Сначала подними нужный трек.";
@@ -65,7 +56,7 @@ function getOrderAvailabilityHint(game: GameState): string {
     return "В списке есть заказы, найденные на прогулках. Друзья продолжают открывать основной рынок.";
   }
 
-  return "Пул заказов можно обновлять вручную, чтобы попытаться получить новые варианты.";
+  return "Заказы ротируются и могут возвращаться в витрину. Обновляй список, чтобы ловить повторы и более выгодные варианты.";
 }
 
 function renderPcSpecs(specs: PcSpecs) {

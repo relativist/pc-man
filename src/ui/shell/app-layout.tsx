@@ -25,6 +25,17 @@ const trackTitles: Record<string, string> = {
 
 const passiveLifeSettleIntervalMs = 10_000;
 
+function formatBuildDate(buildDateIso: string): string {
+  const buildDate = new Date(buildDateIso);
+
+  return Number.isNaN(buildDate.getTime())
+    ? buildDateIso
+    : new Intl.DateTimeFormat("ru-RU", {
+        dateStyle: "short",
+        timeStyle: "short",
+      }).format(buildDate);
+}
+
 function getEncounterName(encounter: PendingSocialEncounter): string {
   if (encounter.kind === "friend") {
     return encounter.friend.name;
@@ -162,6 +173,7 @@ export function AppLayout() {
   const deathRiskWarning = getDeathRiskWarning(game);
   const isDeathRiskModalOpen =
     Boolean(deathRiskWarning) && deathRiskWarning?.key !== dismissedDeathRiskKey;
+  const buildLabel = formatBuildDate(__APP_BUILD_DATE__);
 
   useEffect(() => {
     actions.settleToNow();
@@ -292,8 +304,8 @@ export function AppLayout() {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <div>
-          <p className="eyebrow">Idle Sim / Browser MVP</p>
+        <div className="topbar-brand">
+          <p className="eyebrow">v{__APP_VERSION__} build {buildLabel}</p>
           <h1>Компьютерщик</h1>
         </div>
 

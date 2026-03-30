@@ -259,7 +259,7 @@ export function createInitialGameState(options: CreateNewGameOptions = {}): Game
   const skills = createInitialSkills();
   const initialState = normalizeGameState({
     meta: {
-      version: "0.1.0",
+      version: __APP_VERSION__,
       createdAt: toIsoDate(now),
       updatedAt: toIsoDate(now),
       lastOpenedAt: toIsoDate(now),

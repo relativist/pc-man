@@ -113,7 +113,7 @@ export function startOrder(
 
   const activeOrderSource = gameState.orders.discoveredOrderIds.includes(orderId) ? "walk" : "friend";
 
-  return normalizeGameState({
+  const nextState = normalizeGameState({
     ...gameState,
     orders: {
       ...gameState.orders,
@@ -132,6 +132,8 @@ export function startOrder(
       ),
     },
   });
+
+  return activeOrderSource === "friend" ? consumeFriendOrderSlot(nextState) : nextState;
 }
 
 export function discoverOrderFromWalk(gameState: GameState): { game: GameState; order: Order | null } {
@@ -159,7 +161,6 @@ export function resolveActiveOrder(
   randomValue: number = Math.random(),
 ): GameState {
   const activeOrderId = gameState.orders.activeOrderId;
-  const activeOrderSource = gameState.orders.activeOrderSource;
 
   if (!activeOrderId) {
     throw new Error("No active order to resolve");
@@ -173,7 +174,7 @@ export function resolveActiveOrder(
   const failed = randomValue < order.failureChancePct / 100;
 
   if (failed) {
-    const failedState = normalizeGameState({
+    return normalizeGameState({
       ...gameState,
       orders: {
         ...gameState.orders,
@@ -186,8 +187,6 @@ export function resolveActiveOrder(
         activeOrder: null,
       },
     });
-
-    return activeOrderSource === "friend" ? consumeFriendOrderSlot(failedState) : failedState;
   }
 
   const currentTrackProgress = gameState.skills.tracks[order.track];
@@ -199,7 +198,7 @@ export function resolveActiveOrder(
     order.rewardQualificationPoints,
   );
 
-  const completedState = normalizeGameState({
+  return normalizeGameState({
     ...gameState,
     player: {
       ...gameState.player,
@@ -223,6 +222,4 @@ export function resolveActiveOrder(
       activeOrder: null,
     },
   });
-
-  return activeOrderSource === "friend" ? consumeFriendOrderSlot(completedState) : completedState;
 }

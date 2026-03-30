@@ -121,23 +121,16 @@ function getEncounterRejectedLog(
   };
 }
 
-function isOrderResolved(gameState: GameState, orderId: string): boolean {
-  return (
-    gameState.orders.completedOrderIds.includes(orderId) ||
-    gameState.orders.failedOrderIds.includes(orderId)
-  );
-}
-
 function getOrderRefreshMessage(previousGame: GameState, nextGame: GameState): string {
   const previousVisibleIds = new Set(previousGame.orders.availableOrderIds);
   const addedOrders = nextGame.orders.availableOrderIds.filter((id) => !previousVisibleIds.has(id));
 
   if (addedOrders.length > 0) {
-    return `Добавлены новые заказы: ${addedOrders.length}.`;
+    return `Витрина заказов обновлена: доступны ${addedOrders.length} новых или вернувшихся варианта(ов).`;
   }
 
   if (nextGame.orders.availableOrderIds.length > 0) {
-    return "Пул заказов обновлен. Новых заказов не появилось.";
+    return "Витрина заказов обновлена. В ротации остались текущие варианты.";
   }
 
   if (!hasFriendOrderMarketAccess(nextGame) && nextGame.orders.discoveredOrderIds.length === 0) {
@@ -148,13 +141,13 @@ function getOrderRefreshMessage(previousGame: GameState, nextGame: GameState): s
     return "Новых заказов нет: сначала собери рабочий ПК.";
   }
 
-  const unresolvedOrders = nextGame.world.orderPool.filter(
-    (order) => !isOrderResolved(nextGame, order.id) && nextGame.orders.activeOrderId !== order.id,
+  const inactiveOrders = nextGame.world.orderPool.filter(
+    (order) => nextGame.orders.activeOrderId !== order.id,
   );
-  const qualificationReadyOrders = unresolvedOrders.filter((order) =>
+  const qualificationReadyOrders = inactiveOrders.filter((order) =>
     meetsOrderQualificationRequirements(nextGame, order),
   );
-  const qualificationBlocked = unresolvedOrders.length > qualificationReadyOrders.length;
+  const qualificationBlocked = inactiveOrders.length > qualificationReadyOrders.length;
   const pcBlocked = qualificationReadyOrders.some((order) => !meetsOrderPcRequirements(nextGame, order));
 
   if (qualificationBlocked && pcBlocked) {
