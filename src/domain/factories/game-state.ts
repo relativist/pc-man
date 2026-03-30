@@ -122,7 +122,7 @@ function createInitialPlayerState(playerName: string | undefined, seed: string):
     id: createId("player", "1"),
     name: playerName ?? generatedName,
     ageYears: 21,
-    money: 100000,
+    money: 555,
     realEstateValue: 0,
     propertyValue: 0,
     capital: 1000,
