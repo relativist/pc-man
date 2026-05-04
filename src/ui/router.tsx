@@ -8,43 +8,51 @@ import { PcOrdersPage } from "./views/pc-orders-page";
 import { ShopPage } from "./views/shop-page";
 import { SocialPage } from "./views/social-page";
 
-export const appRouter = createBrowserRouter([
+const routerBaseName =
+  import.meta.env.BASE_URL === "/" ? undefined : import.meta.env.BASE_URL.replace(/\/$/, "");
+
+export const appRouter = createBrowserRouter(
+  [
+    {
+      path: "/",
+      element: <AppLayout />,
+      children: [
+        {
+          index: true,
+          element: <Navigate to="/hero" replace />,
+        },
+        {
+          path: "hero",
+          element: <HeroPage />,
+        },
+        {
+          path: "pc",
+          element: <PcOrdersPage />,
+        },
+        {
+          path: "shop",
+          element: <ShopPage />,
+        },
+        {
+          path: "career",
+          element: <CareerPage />,
+        },
+        {
+          path: "learning",
+          element: <LearningPage />,
+        },
+        {
+          path: "social",
+          element: <SocialPage />,
+        },
+        {
+          path: "life",
+          element: <Navigate to="/hero" replace />,
+        },
+      ],
+    },
+  ],
   {
-    path: "/",
-    element: <AppLayout />,
-    children: [
-      {
-        index: true,
-        element: <Navigate to="/hero" replace />,
-      },
-      {
-        path: "hero",
-        element: <HeroPage />,
-      },
-      {
-        path: "pc",
-        element: <PcOrdersPage />,
-      },
-      {
-        path: "shop",
-        element: <ShopPage />,
-      },
-      {
-        path: "career",
-        element: <CareerPage />,
-      },
-      {
-        path: "learning",
-        element: <LearningPage />,
-      },
-      {
-        path: "social",
-        element: <SocialPage />,
-      },
-      {
-        path: "life",
-        element: <Navigate to="/hero" replace />,
-      },
-    ],
+    basename: routerBaseName,
   },
-]);
+);

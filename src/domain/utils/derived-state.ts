@@ -278,6 +278,7 @@ export function normalizeGameState(gameState: GameState): GameState {
         shopGameState.meta.lastViewedLogAt ??
         shopGameState.logs[0]?.at ??
         shopGameState.meta.updatedAt,
+      hasSeenIntro: shopGameState.meta.hasSeenIntro ?? true,
     },
     player: {
       ...shopGameState.player,

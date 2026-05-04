@@ -1,12 +1,15 @@
 {
   "name": "pc-man",
   "private": true,
-  "version": "0.6.5",
+  "version": "0.6.6",
   "type": "module",
   "scripts": {
-    "dev": "vite --host 0.0.0.0 --port 4173",
-    "build": "tsc -p tsconfig.json && vite build",
-    "preview": "vite preview --host 0.0.0.0 --port 4173"
+    "dev": "APP_BASE_PATH=/pc-man/ vite --host 0.0.0.0 --port 4173",
+    "dev:root": "vite --host 0.0.0.0 --port 4173",
+    "build": "APP_BASE_PATH=/pc-man/ tsc -p tsconfig.json && vite build",
+    "build:root": "tsc -p tsconfig.json && vite build",
+    "preview": "APP_BASE_PATH=/pc-man/ vite preview --host 0.0.0.0 --port 4173",
+    "preview:root": "vite preview --host 0.0.0.0 --port 4173"
   },
   "dependencies": {
     "react": "^19.2.0",

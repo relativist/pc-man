@@ -264,6 +264,7 @@ export function createInitialGameState(options: CreateNewGameOptions = {}): Game
       updatedAt: toIsoDate(now),
       lastOpenedAt: toIsoDate(now),
       lastViewedLogAt: toIsoDate(now),
+      hasSeenIntro: false,
       saveSlotId,
       isGameOver: false,
       gameOverReason: null,

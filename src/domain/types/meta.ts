@@ -6,6 +6,7 @@ export type MetaState = {
   updatedAt: IsoDateString;
   lastOpenedAt: IsoDateString;
   lastViewedLogAt: IsoDateString | null;
+  hasSeenIntro: boolean;
   saveSlotId: string;
   isGameOver: boolean;
   gameOverReason: GameOverReason;

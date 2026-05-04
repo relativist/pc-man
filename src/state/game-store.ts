@@ -39,6 +39,7 @@ export type GameStoreState = {
   game: GameState;
   actions: {
     resetGame: (options?: CreateNewGameOptions) => void;
+    dismissIntro: () => void;
     hydrateGame: (gameState: GameState) => void;
     patchGame: (updater: (gameState: GameState) => GameState) => void;
     setPlayerName: (name: string) => void;
@@ -189,6 +190,26 @@ export function createGameStore(options?: CreateNewGameOptions) {
       resetGame: (resetOptions) => {
         set({
           game: createInitialGameState(resetOptions),
+        });
+      },
+      dismissIntro: () => {
+        const now = new Date();
+
+        set((state) => {
+          const settledGame = settleGame(state.game, now);
+
+          return {
+            game: touchGameMeta(
+              {
+                ...settledGame,
+                meta: {
+                  ...settledGame.meta,
+                  hasSeenIntro: true,
+                },
+              },
+              now,
+            ),
+          };
         });
       },
       hydrateGame: (gameState) => {

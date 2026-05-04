@@ -171,6 +171,7 @@ export function AppLayout() {
   const unreadCount = unreadLogs.length;
   const latestLogAt = logs[0]?.at ?? null;
   const deathRiskWarning = getDeathRiskWarning(game);
+  const isIntroModalOpen = !meta.hasSeenIntro;
   const isDeathRiskModalOpen =
     Boolean(deathRiskWarning) && deathRiskWarning?.key !== dismissedDeathRiskKey;
   const buildLabel = formatBuildDate(__APP_BUILD_DATE__);
@@ -399,7 +400,66 @@ export function AppLayout() {
         )}
       </aside>
 
-      {isDeathRiskModalOpen && deathRiskWarning ? (
+      {isIntroModalOpen ? (
+        <div className="modal-backdrop">
+          <div className="modal-card">
+            <div className="section-head">
+              <div>
+                <p className="eyebrow">Как играть</p>
+                <h3>Первые шаги в "Компьютерщике"</h3>
+              </div>
+              <span className="badge">Новая игра</span>
+            </div>
+
+            <p>
+              Твоя цель проста: вырасти из новичка без нормальной работы и слабого ПК в
+              уверенного специалиста с сильным доходом, хорошим железом и сетью полезных знакомых.
+            </p>
+
+            <div className="stat-list">
+              <article className="stat-item">
+                <strong>1. Учись</strong>
+                <span>
+                  Покупай книги и читай их, чтобы поднимать квалификацию и открывать путь к
+                  более сильным вакансиям и заказам.
+                </span>
+              </article>
+              <article className="stat-item">
+                <strong>2. Ищи работу</strong>
+                <span>
+                  Заходи в "Карьеру", запускай поиск и выбирай предложения, которые соответствуют
+                  твоим навыкам.
+                </span>
+              </article>
+              <article className="stat-item">
+                <strong>3. Улучшай ПК и бери заказы</strong>
+                <span>
+                  В разделе "ПК и Заказы" собирай рабочий компьютер, повышай PC score и закрывай
+                  более дорогие задачи.
+                </span>
+              </article>
+              <article className="stat-item">
+                <strong>4. Заводи знакомства</strong>
+                <span>
+                  Через прогулки и соцжизнь находи друзей и контакты: они помогают получать новые
+                  заказы и двигают прогресс быстрее.
+                </span>
+              </article>
+            </div>
+
+            <p className="muted">
+              Следи за голодом, здоровьем и весом. Если полностью игнорировать быт, герой может
+              умереть раньше, чем доберется до хорошей карьеры.
+            </p>
+
+            <div className="modal-actions">
+              <button className="primary-button" onClick={() => actions.dismissIntro()}>
+                Погнали
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : isDeathRiskModalOpen && deathRiskWarning ? (
         <div className="modal-backdrop">
           <div className="modal-card">
             <div className="section-head">
