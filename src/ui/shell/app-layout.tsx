@@ -6,12 +6,12 @@ import { formatUiAgeYears } from "../display-format";
 import { useGameStore } from "../store-hooks";
 
 const navItems = [
-  { to: "/hero", label: "Герой" },
-  { to: "/pc", label: "ПК и Заказы" },
-  { to: "/shop", label: "Магазин" },
-  { to: "/career", label: "Карьера" },
-  { to: "/learning", label: "Обучение" },
-  { to: "/social", label: "Хобби и Соцжизнь" },
+  { to: "/hero", label: "Герой", code: "ID" },
+  { to: "/pc", label: "ПК и Заказы", code: "PC" },
+  { to: "/shop", label: "Магазин", code: "MK" },
+  { to: "/career", label: "Карьера", code: "CV" },
+  { to: "/learning", label: "Обучение", code: "XP" },
+  { to: "/social", label: "Соцжизнь", code: "NET" },
 ];
 
 const trackTitles: Record<string, string> = {
@@ -344,7 +344,8 @@ export function AppLayout() {
                   isActive ? "nav-card nav-card-active" : "nav-card"
                 }
               >
-                {item.label}
+                <span className="nav-mark">{item.code}</span>
+                <span className="nav-label">{item.label}</span>
               </NavLink>
             ))}
           </nav>
