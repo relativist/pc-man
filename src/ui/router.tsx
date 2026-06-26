@@ -19,7 +19,7 @@ export const appRouter = createBrowserRouter(
       children: [
         {
           index: true,
-          element: <Navigate to="/hero" replace />,
+          element: <Navigate to="hero" replace />,
         },
         {
           path: "hero",
@@ -47,7 +47,7 @@ export const appRouter = createBrowserRouter(
         },
         {
           path: "life",
-          element: <Navigate to="/hero" replace />,
+          element: <Navigate to="hero" replace />,
         },
       ],
     },
